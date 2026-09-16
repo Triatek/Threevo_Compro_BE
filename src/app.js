@@ -6,11 +6,13 @@ import express from 'express';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 import { env } from './config/env.js';
+import { createDocsRouter } from './lib/apiDocs.js';
 import { logger } from './lib/logger.js';
 import { UPLOAD_ROOT, UPLOAD_URL_PATH } from './lib/storage.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { notFound } from './middlewares/notFound.js';
 import { globalLimiter } from './middlewares/rateLimiter.js';
+import seoRoutes from './modules/seo/seo.routes.js';
 import routes from './routes/index.js';
 
 const REQUEST_ID_PATTERN = /^[\w-]{1,100}$/;
@@ -45,6 +47,11 @@ app.use(
   }),
 );
 
+// API docs are mounted before the global helmet because they need their own CSP.
+if (env.ENABLE_DOCS) {
+  app.use('/docs', createDocsRouter());
+}
+
 app.use(helmet());
 app.use(
   cors({
@@ -75,6 +82,7 @@ app.use(
   }),
 );
 
+app.use(seoRoutes);
 app.use(env.API_PREFIX, globalLimiter, routes);
 
 app.use(notFound);
