@@ -16,6 +16,11 @@ tags:
   - name: Auth
   - name: Admin - Users
   - name: Admin - Audit Logs
+  - name: Public
+  - name: Admin - Settings
+  - name: Admin - Banners
+  - name: Admin - Clients
+  - name: Admin - Testimonials
 paths:
   /health:
     get:
@@ -425,6 +430,584 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /site:
+    get:
+      tags:
+        - Public
+      summary: Data situs untuk Home & layout
+      description: Settings publik, banner/klien/testimoni aktif, dan layanan featured. Di-cache di server & diinvalidasi saat admin mengubah data.
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Site"
+  /admin/settings:
+    get:
+      tags:
+        - Admin - Settings
+      summary: Semua setting (SUPER_ADMIN)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Settings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    put:
+      tags:
+        - Admin - Settings
+      summary: Simpan setting (SUPER_ADMIN)
+      description: Kirim sebagian atau semua key. Key tidak dikenal → 422. Kosongkan nilai dengan string "".
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsInput"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Settings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/banners:
+    get:
+      tags:
+        - Admin - Banners
+      summary: Daftar banners (urut sortOrder)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Banner"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Admin - Banners
+      summary: Buat banners
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/BannerInput"
+                - required:
+                    - title
+                    - image
+      responses:
+        "201":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Banner"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/banners/reorder:
+    patch:
+      tags:
+        - Admin - Banners
+      summary: Ubah urutan banners
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderItems"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/banners/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags:
+        - Admin - Banners
+      summary: Detail
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Banner"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Admin - Banners
+      summary: Ubah (sebagian field)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/BannerInput"
+                - minProperties: 1
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Banner"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - Admin - Banners
+      summary: Hapus
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/clients:
+    get:
+      tags:
+        - Admin - Clients
+      summary: Daftar clients (urut sortOrder)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Client"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Admin - Clients
+      summary: Buat clients
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ClientInput"
+                - required:
+                    - name
+                    - logo
+      responses:
+        "201":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Client"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/clients/reorder:
+    patch:
+      tags:
+        - Admin - Clients
+      summary: Ubah urutan clients
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderItems"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/clients/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags:
+        - Admin - Clients
+      summary: Detail
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Client"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Admin - Clients
+      summary: Ubah (sebagian field)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ClientInput"
+                - minProperties: 1
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Client"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - Admin - Clients
+      summary: Hapus
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/testimonials:
+    get:
+      tags:
+        - Admin - Testimonials
+      summary: Daftar testimonials (urut sortOrder)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Testimonial"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Admin - Testimonials
+      summary: Buat testimonials
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/TestimonialInput"
+                - required:
+                    - name
+                    - message
+      responses:
+        "201":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Testimonial"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/testimonials/reorder:
+    patch:
+      tags:
+        - Admin - Testimonials
+      summary: Ubah urutan testimonials
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderItems"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/testimonials/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags:
+        - Admin - Testimonials
+      summary: Detail
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Testimonial"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Admin - Testimonials
+      summary: Ubah (sebagian field)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/TestimonialInput"
+                - minProperties: 1
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Testimonial"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - Admin - Testimonials
+      summary: Hapus
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   schemas:
     SuccessResponse:
@@ -597,6 +1180,231 @@ components:
               type: string
             email:
               type: string
+    ReorderItems:
+      type: array
+      minItems: 1
+      items:
+        type: object
+        required:
+          - id
+          - sortOrder
+        properties:
+          id:
+            type: integer
+          sortOrder:
+            type: integer
+            minimum: 0
+      example:
+        - id: 3
+          sortOrder: 0
+        - id: 1
+          sortOrder: 1
+    ImageUrl:
+      type: string
+      description: URL http(s) atau path `/uploads/...` dari POST /admin/media
+      example: /uploads/2026/01/abc.webp
+    BannerInput:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 150
+        subtitle:
+          type:
+            - string
+            - "null"
+          maxLength: 300
+        image:
+          $ref: "#/components/schemas/ImageUrl"
+        ctaText:
+          type:
+            - string
+            - "null"
+          maxLength: 50
+        ctaLink:
+          type:
+            - string
+            - "null"
+          description: URL http(s) atau path diawali "/"
+        sortOrder:
+          type: integer
+          default: 0
+        isActive:
+          type: boolean
+          default: true
+    ClientInput:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 150
+        logo:
+          $ref: "#/components/schemas/ImageUrl"
+        website:
+          type:
+            - string
+            - "null"
+          format: uri
+        sortOrder:
+          type: integer
+          default: 0
+        isActive:
+          type: boolean
+          default: true
+    TestimonialInput:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        position:
+          type:
+            - string
+            - "null"
+        company:
+          type:
+            - string
+            - "null"
+        message:
+          type: string
+          maxLength: 2000
+        photo:
+          oneOf:
+            - $ref: "#/components/schemas/ImageUrl"
+            - type: "null"
+        sortOrder:
+          type: integer
+          default: 0
+        isActive:
+          type: boolean
+          default: true
+    Settings:
+      type: object
+      description: Objek key-value. Endpoint publik hanya berisi setting publik.
+      additionalProperties:
+        type: string
+      example:
+        company_name: Threevo
+        whatsapp_number: "6281200000000"
+        whatsapp_message: Halo Threevo...
+    SettingsInput:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        company_name:
+          type: string
+        company_tagline:
+          type: string
+        contact_phone:
+          type: string
+        contact_email:
+          type: string
+        contact_address:
+          type: string
+        contact_maps_url:
+          type: string
+        whatsapp_number:
+          type: string
+        whatsapp_message:
+          type: string
+        social_instagram:
+          type: string
+        social_linkedin:
+          type: string
+        social_youtube:
+          type: string
+        social_tiktok:
+          type: string
+        tracking_url:
+          type: string
+        footer_text:
+          type: string
+        lead_notification_email:
+          type: string
+          description: Privat. Boleh beberapa email dipisah koma.
+    ServiceSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        shortDesc:
+          type:
+            - string
+            - "null"
+        icon:
+          type:
+            - string
+            - "null"
+        image:
+          type:
+            - string
+            - "null"
+    Banner:
+      allOf:
+        - $ref: "#/components/schemas/BannerInput"
+        - type: object
+          properties:
+            id:
+              type: integer
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+    Client:
+      allOf:
+        - $ref: "#/components/schemas/ClientInput"
+        - type: object
+          properties:
+            id:
+              type: integer
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+    Testimonial:
+      allOf:
+        - $ref: "#/components/schemas/TestimonialInput"
+        - type: object
+          properties:
+            id:
+              type: integer
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+    Site:
+      type: object
+      properties:
+        settings:
+          $ref: "#/components/schemas/Settings"
+        banners:
+          type: array
+          items:
+            $ref: "#/components/schemas/Banner"
+        clients:
+          type: array
+          items:
+            $ref: "#/components/schemas/Client"
+        testimonials:
+          type: array
+          items:
+            $ref: "#/components/schemas/Testimonial"
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceSummary"
+          description: Layanan featured
   responses:
     ValidationError:
       description: Data tidak valid

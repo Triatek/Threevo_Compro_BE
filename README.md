@@ -116,5 +116,8 @@ docs/            BACKEND_SPEC.md, openapi.yaml
 | PATCH | `/api/v1/auth/me/password` | Ganti password sendiri |
 | CRUD | `/api/v1/admin/users` | Kelola user (SUPER_ADMIN); DELETE = nonaktifkan |
 | GET | `/api/v1/admin/audit-logs` | Audit log (SUPER_ADMIN) |
+| GET | `/api/v1/site` | Settings publik, banner, klien, testimoni aktif, layanan featured |
+| GET/PUT | `/api/v1/admin/settings` | Pengaturan situs (SUPER_ADMIN) |
+| CRUD + reorder | `/api/v1/admin/banners`, `/clients`, `/testimonials` | Konten Home |
 
 Endpoint lain ditambahkan per fase (lihat checklist di spec).

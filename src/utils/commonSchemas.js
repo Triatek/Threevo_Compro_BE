@@ -36,8 +36,18 @@ export const imageUrlSchema = z
     'Harus berupa URL http(s) atau path /uploads/...',
   );
 
-/** Optional http(s) URL, empty string not allowed (send null to clear). */
+/** http(s) URL, empty string not allowed (send null to clear). */
 export const httpUrlSchema = z.httpUrl().max(500);
+
+/** Link used by buttons: absolute http(s) URL or a site-relative path like "/kontak". */
+export const linkSchema = z
+  .string()
+  .trim()
+  .max(500)
+  .refine(
+    (value) => /^https?:\/\/\S+$/i.test(value) || /^\/(?!\/)\S*$/.test(value),
+    'Harus berupa URL http(s) atau path yang diawali "/"',
+  );
 
 /** Body of `PATCH /<resource>/reorder` */
 export const reorderSchema = z

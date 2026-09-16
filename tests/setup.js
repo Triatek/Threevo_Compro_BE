@@ -1,4 +1,4 @@
-import { afterAll, beforeAll } from 'vitest';
+import { afterAll, beforeAll, beforeEach } from 'vitest';
 import { loadTestEnv } from './loadTestEnv.js';
 
 // Must run before any app module reads the environment.
@@ -6,6 +6,12 @@ loadTestEnv();
 
 // Imported dynamically so env.js sees the variables loaded above.
 const { prisma } = await import('../src/lib/prisma.js');
+const cache = await import('../src/lib/cache.js');
+
+// Each test starts with an empty in-memory cache.
+beforeEach(() => {
+  cache.clear();
+});
 
 beforeAll(async () => {
   const tables = await prisma.$queryRaw`

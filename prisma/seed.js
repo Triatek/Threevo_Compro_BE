@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { env } from '../src/config/env.js';
 import { prisma } from '../src/lib/prisma.js';
+import { SETTING_DEFINITIONS } from '../src/modules/settings/settings.schema.js';
 
 const BCRYPT_COST = 12;
 
@@ -54,10 +55,11 @@ async function seedSettings() {
     { key: 'social_tiktok', value: '' },
     { key: 'tracking_url', value: '' },
     { key: 'footer_text', value: `© ${new Date().getFullYear()} Threevo. All rights reserved.` },
-    { key: 'lead_notification_email', value: env.LEAD_NOTIFICATION_EMAIL ?? '', isPublic: false },
+    { key: 'lead_notification_email', value: env.LEAD_NOTIFICATION_EMAIL ?? '' },
   ];
 
-  for (const { key, value, isPublic = true } of settings) {
+  for (const { key, value } of settings) {
+    const { isPublic } = SETTING_DEFINITIONS[key];
     // update: {} keeps values already changed by an admin.
     await prisma.setting.upsert({ where: { key }, update: {}, create: { key, value, isPublic } });
   }
