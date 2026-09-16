@@ -17,16 +17,17 @@ async function seedSuperAdmin() {
     generated = true;
   }
 
-  const existing = await prisma.user.findUnique({ where: { email: env.SEED_ADMIN_EMAIL } });
+  const email = env.SEED_ADMIN_EMAIL.toLowerCase();
+  const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
-    console.log(`- Super admin ${env.SEED_ADMIN_EMAIL} already exists, skipped`);
+    console.log(`- Super admin ${email} already exists, skipped`);
     return existing;
   }
 
   const admin = await prisma.user.create({
     data: {
       name: env.SEED_ADMIN_NAME,
-      email: env.SEED_ADMIN_EMAIL,
+      email,
       passwordHash: await bcrypt.hash(password, BCRYPT_COST),
       role: 'SUPER_ADMIN',
     },

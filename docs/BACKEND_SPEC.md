@@ -629,7 +629,7 @@ Dockerfile, compose produksi, CI GitHub Actions, script backup, `docs/DEPLOYMENT
 
 ## 11. Checklist progres
 - [x] Fase 0 — Fondasi
-- [ ] Fase 1 — Auth & Users
+- [x] Fase 1 — Auth & Users
 - [ ] Fase 2 — Settings & konten Home
 - [ ] Fase 3 — Services & Locations
 - [ ] Fase 4 — Categories & Articles

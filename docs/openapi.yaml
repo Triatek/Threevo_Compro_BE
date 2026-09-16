@@ -11,33 +11,35 @@ info:
 servers:
   - url: http://localhost:4000/api/v1
     description: Development
-
 tags:
   - name: System
-
+  - name: Auth
+  - name: Admin - Users
+  - name: Admin - Audit Logs
 paths:
   /health:
     get:
-      tags: [System]
+      tags:
+        - System
       summary: Health check (termasuk koneksi database)
       responses:
-        '200':
+        "200":
           description: Server dan database sehat
           content:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessResponse'
+                  - $ref: "#/components/schemas/SuccessResponse"
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/Health'
-        '503':
+                        $ref: "#/components/schemas/Health"
+        "503":
           description: Database tidak dapat dihubungi
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
               example:
                 success: false
                 error:
@@ -46,12 +48,390 @@ paths:
                   details:
                     - field: database
                       message: Database tidak dapat dihubungi
-
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Login (set cookie access_token & refresh_token)
+      description: Rate limit 10 request / 15 menit per IP. Pesan gagal selalu sama.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /auth/refresh:
+    post:
+      tags:
+        - Auth
+      summary: Perbarui sesi (rotasi refresh token)
+      description: Memakai cookie `refresh_token` (path /api/v1/auth). Token lama langsung tidak berlaku. Memakai ulang token lama mencabut semua sesi user.
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: Logout (cabut refresh token & hapus cookie)
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+  /auth/me:
+    get:
+      tags:
+        - Auth
+      summary: Profil user yang login
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /auth/me/password:
+    patch:
+      tags:
+        - Auth
+      summary: Ganti password sendiri
+      description: Semua sesi lain dicabut; sesi saat ini tetap aktif. Password lama salah → 422.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - currentPassword
+                - newPassword
+              properties:
+                currentPassword:
+                  type: string
+                newPassword:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+                  description: Minimal 8 karakter, mengandung huruf dan angka
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/users:
+    get:
+      tags:
+        - Admin - Users
+      summary: Daftar user (SUPER_ADMIN)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Q"
+        - name: role
+          in: query
+          schema:
+            $ref: "#/components/schemas/Role"
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags:
+        - Admin - Users
+      summary: Buat user (SUPER_ADMIN)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - password
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+                  description: Minimal 8 karakter, mengandung huruf dan angka
+                role:
+                  $ref: "#/components/schemas/Role"
+                isActive:
+                  type: boolean
+                  default: true
+      responses:
+        "201":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/users/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags:
+        - Admin - Users
+      summary: Detail user
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/User"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Admin - Users
+      summary: Ubah user
+      description: Tidak bisa menonaktifkan/mengubah role diri sendiri atau super admin aktif terakhir. Ganti password/nonaktifkan mencabut semua sesi user tersebut.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+                  description: Minimal 8 karakter, mengandung huruf dan angka
+                role:
+                  $ref: "#/components/schemas/Role"
+                isActive:
+                  type: boolean
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - Admin - Users
+      summary: Nonaktifkan user (data tidak dihapus)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/audit-logs:
+    get:
+      tags:
+        - Admin - Audit Logs
+      summary: Daftar audit log (SUPER_ADMIN)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - name: entity
+          in: query
+          schema:
+            type: string
+          example: Article
+        - name: action
+          in: query
+          schema:
+            type: string
+          example: UPDATE
+        - name: userId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/AuditLog"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 components:
   schemas:
     SuccessResponse:
       type: object
-      required: [success, data]
+      required:
+        - success
+        - data
       properties:
         success:
           type: boolean
@@ -60,18 +440,21 @@ components:
           type: string
         data: {}
         meta:
-          $ref: '#/components/schemas/PaginationMeta'
-
+          $ref: "#/components/schemas/PaginationMeta"
     ErrorResponse:
       type: object
-      required: [success, error]
+      required:
+        - success
+        - error
       properties:
         success:
           type: boolean
           const: false
         error:
           type: object
-          required: [code, message]
+          required:
+            - code
+            - message
           properties:
             code:
               type: string
@@ -96,43 +479,210 @@ components:
                 properties:
                   location:
                     type: string
-                    enum: [body, query, params]
+                    enum:
+                      - body
+                      - query
+                      - params
                   field:
                     type: string
                   message:
                     type: string
-
     PaginationMeta:
       type: object
       properties:
-        page: { type: integer, example: 1 }
-        limit: { type: integer, example: 10 }
-        total: { type: integer, example: 42 }
-        totalPages: { type: integer, example: 5 }
-        hasNextPage: { type: boolean }
-        hasPrevPage: { type: boolean }
-
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          example: 42
+        totalPages:
+          type: integer
+          example: 5
+        hasNextPage:
+          type: boolean
+        hasPrevPage:
+          type: boolean
     Health:
       type: object
       properties:
-        status: { type: string, example: OK }
-        uptime: { type: integer, description: Detik sejak server berjalan }
-        timestamp: { type: string, format: date-time }
+        status:
+          type: string
+          example: OK
+        uptime:
+          type: integer
+          description: Detik sejak server berjalan
+        timestamp:
+          type: string
+          format: date-time
         services:
           type: object
           properties:
-            database: { type: string, enum: [up, down] }
-
+            database:
+              type: string
+              enum:
+                - up
+                - down
+    Role:
+      type: string
+      enum:
+        - SUPER_ADMIN
+        - EDITOR
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: "#/components/schemas/Role"
+        isActive:
+          type: boolean
+        lastLoginAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type:
+            - integer
+            - "null"
+        action:
+          type: string
+          example: UPDATE
+        entity:
+          type: string
+          example: Article
+        entityId:
+          type:
+            - string
+            - "null"
+        metadata:
+          type:
+            - object
+            - "null"
+        ipAddress:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+        user:
+          type:
+            - object
+            - "null"
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            email:
+              type: string
   responses:
     ValidationError:
       description: Data tidak valid
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
     TooManyRequests:
       description: Rate limit terlampaui
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
+    BadRequest:
+      description: Permintaan tidak valid (400)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Belum login / sesi tidak valid (401)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Role tidak memiliki akses (403)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Data tidak ditemukan (404)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Data bentrok, mis. slug/email sudah dipakai (409)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+      description: Diset otomatis oleh POST /auth/login
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Alternatif untuk tools seperti Postman
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    Slug:
+      name: slug
+      in: path
+      required: true
+      schema:
+        type: string
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 10
+    Q:
+      name: q
+      in: query
+      schema:
+        type: string
+      description: Kata kunci pencarian

@@ -1,5 +1,10 @@
 import { Router } from 'express';
+import { requireAuth } from '../middlewares/auth.js';
+import { noStore } from '../middlewares/cacheControl.js';
+import auditLogsRoutes from '../modules/auditLogs/auditLogs.routes.js';
+import authRoutes from '../modules/auth/auth.routes.js';
 import healthRoutes from '../modules/health/health.routes.js';
+import usersRoutes from '../modules/users/users.routes.js';
 
 const router = Router();
 
@@ -7,11 +12,15 @@ const router = Router();
 router.use('/health', healthRoutes);
 
 // ---------- Auth ----------
-// (Phase 1)
+router.use('/auth', noStore, authRoutes);
 
-// ---------- Admin (requireAuth) ----------
+// ---------- Admin (login required) ----------
 const adminRouter = Router();
-// (Phase 1+)
+adminRouter.use(noStore, requireAuth);
+
+adminRouter.use('/users', usersRoutes);
+adminRouter.use('/audit-logs', auditLogsRoutes);
+
 router.use('/admin', adminRouter);
 
 export default router;

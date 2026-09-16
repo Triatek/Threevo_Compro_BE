@@ -109,5 +109,12 @@ docs/            BACKEND_SPEC.md, openapi.yaml
 | Method | Path | Keterangan |
 |---|---|---|
 | GET | `/api/v1/health` | Status server + cek database (503 jika database mati) |
+| POST | `/api/v1/auth/login` | Login, set cookie `access_token` & `refresh_token` |
+| POST | `/api/v1/auth/refresh` | Rotasi refresh token |
+| POST | `/api/v1/auth/logout` | Logout |
+| GET | `/api/v1/auth/me` | Profil user login |
+| PATCH | `/api/v1/auth/me/password` | Ganti password sendiri |
+| CRUD | `/api/v1/admin/users` | Kelola user (SUPER_ADMIN); DELETE = nonaktifkan |
+| GET | `/api/v1/admin/audit-logs` | Audit log (SUPER_ADMIN) |
 
 Endpoint lain ditambahkan per fase (lihat checklist di spec).
