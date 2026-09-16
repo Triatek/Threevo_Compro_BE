@@ -614,16 +614,16 @@ Dockerfile, compose produksi, CI GitHub Actions, script backup, `docs/DEPLOYMENT
 ---
 
 ## 10. Checklist keamanan akhir
-- [ ] Tidak ada secret di repo; `.env*` (kecuali example) di-ignore
-- [ ] Semua input divalidasi Zod; field tak dikenal dibuang
-- [ ] HTML dari admin disanitasi; input pengunjung di-escape di email
-- [ ] Password bcrypt, pesan login generik, rate limit login & lead
-- [ ] Cookie httpOnly/secure/sameSite; refresh token di-hash & dirotasi
-- [ ] Endpoint admin semua di balik `requireAuth`; role dicek
-- [ ] Upload divalidasi isi, dikonversi, nama acak, tanpa SVG
-- [ ] Error 500 tidak membocorkan detail di production
-- [ ] CORS hanya origin frontend; helmet aktif
-- [ ] Log tidak berisi password, token, atau cookie
+- [x] Tidak ada secret di repo; `.env*` (kecuali example) di-ignore
+- [x] Semua input divalidasi Zod; field tak dikenal dibuang
+- [x] HTML dari admin disanitasi; input pengunjung di-escape di email
+- [x] Password bcrypt, pesan login generik, rate limit login & lead
+- [x] Cookie httpOnly/secure/sameSite; refresh token di-hash & dirotasi
+- [x] Endpoint admin semua di balik `requireAuth`; role dicek
+- [x] Upload divalidasi isi, dikonversi, nama acak, tanpa SVG
+- [x] Error 500 tidak membocorkan detail di production
+- [x] CORS hanya origin frontend; helmet aktif
+- [x] Log tidak berisi password, token, atau cookie
 
 ---
 
@@ -637,4 +637,4 @@ Dockerfile, compose produksi, CI GitHub Actions, script backup, `docs/DEPLOYMENT
 - [x] Fase 6 — Leads
 - [x] Fase 7 — Tracking
 - [x] Fase 8 — SEO & dokumentasi
-- [ ] Fase 9 — Kesiapan produksi
+- [x] Fase 9 — Kesiapan produksi

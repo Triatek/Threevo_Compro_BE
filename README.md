@@ -141,6 +141,8 @@ src/
   server.js        koneksi DB, listen, graceful shutdown
 tests/             Vitest + Supertest (satu file per modul)
 docs/              BACKEND_SPEC.md, openapi.yaml, DEPLOYMENT.md
+scripts/           backup-db.ps1, backup-db.sh
+Dockerfile, docker-compose.prod.yml, .github/workflows/ci.yml
 ```
 
 ## Konvensi
