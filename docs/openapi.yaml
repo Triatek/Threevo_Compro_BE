@@ -21,6 +21,8 @@ tags:
   - name: Admin - Banners
   - name: Admin - Clients
   - name: Admin - Testimonials
+  - name: Admin - Services
+  - name: Admin - Locations
 paths:
   /health:
     get:
@@ -1008,6 +1010,435 @@ paths:
                         type: "null"
         "404":
           $ref: "#/components/responses/NotFound"
+  /services:
+    get:
+      tags:
+        - Public
+      summary: Daftar layanan aktif (urut sortOrder, tanpa content)
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/PublicService"
+  /services/{slug}:
+    get:
+      tags:
+        - Public
+      summary: Detail layanan aktif
+      parameters:
+        - $ref: "#/components/parameters/Slug"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/PublicServiceDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /locations:
+    get:
+      tags:
+        - Public
+      summary: Daftar lokasi aktif (untuk peta)
+      parameters:
+        - name: city
+          in: query
+          schema:
+            type: string
+          description: Tidak peka huruf besar/kecil
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/LocationType"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/PublicLocation"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/services:
+    get:
+      tags:
+        - Admin - Services
+      summary: Daftar services
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Q"
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+        - name: isFeatured
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Service"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Admin - Services
+      summary: Buat services
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ServiceInput"
+                - required:
+                    - name
+      responses:
+        "201":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Service"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/services/reorder:
+    patch:
+      tags:
+        - Admin - Services
+      summary: Ubah urutan services
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderItems"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/services/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags:
+        - Admin - Services
+      summary: Detail
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Service"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Admin - Services
+      summary: Ubah (sebagian field)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ServiceInput"
+                - minProperties: 1
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Service"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - Admin - Services
+      summary: Hapus (soft delete)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/locations:
+    get:
+      tags:
+        - Admin - Locations
+      summary: Daftar locations
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Q"
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/LocationType"
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Location"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Admin - Locations
+      summary: Buat locations
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/LocationInput"
+                - required:
+                    - name
+                    - address
+                    - city
+      responses:
+        "201":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Location"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/locations/reorder:
+    patch:
+      tags:
+        - Admin - Locations
+      summary: Ubah urutan locations
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderItems"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/locations/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags:
+        - Admin - Locations
+      summary: Detail
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Location"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Admin - Locations
+      summary: Ubah (sebagian field)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/LocationInput"
+                - minProperties: 1
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Location"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - Admin - Locations
+      summary: Hapus
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   schemas:
     SuccessResponse:
@@ -1405,6 +1836,194 @@ components:
           items:
             $ref: "#/components/schemas/ServiceSummary"
           description: Layanan featured
+    ServiceInput:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 150
+        slug:
+          type: string
+          description: Opsional. Jika kosong dibuat otomatis dari nama (unik, -2, -3). Slug eksplisit yang bentrok → 409.
+        shortDesc:
+          type:
+            - string
+            - "null"
+          maxLength: 300
+        content:
+          type:
+            - string
+            - "null"
+          description: HTML; disanitasi di server
+        icon:
+          type:
+            - string
+            - "null"
+          description: Nama ikon untuk frontend atau URL gambar
+        image:
+          oneOf:
+            - $ref: "#/components/schemas/ImageUrl"
+            - type: "null"
+        metaTitle:
+          type:
+            - string
+            - "null"
+          maxLength: 70
+        metaDescription:
+          type:
+            - string
+            - "null"
+          maxLength: 160
+        isFeatured:
+          type: boolean
+          default: false
+        sortOrder:
+          type: integer
+          default: 0
+        isActive:
+          type: boolean
+          default: true
+    PublicService:
+      allOf:
+        - $ref: "#/components/schemas/ServiceSummary"
+        - type: object
+          properties:
+            isFeatured:
+              type: boolean
+            sortOrder:
+              type: integer
+    PublicServiceDetail:
+      allOf:
+        - $ref: "#/components/schemas/PublicService"
+        - type: object
+          properties:
+            content:
+              type:
+                - string
+                - "null"
+            metaTitle:
+              type:
+                - string
+                - "null"
+            metaDescription:
+              type:
+                - string
+                - "null"
+            updatedAt:
+              type: string
+              format: date-time
+    LocationType:
+      type: string
+      enum:
+        - WAREHOUSE
+        - OFFICE
+        - HUB
+    LocationInput:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 150
+        type:
+          $ref: "#/components/schemas/LocationType"
+        address:
+          type: string
+          maxLength: 300
+        city:
+          type: string
+          maxLength: 100
+        province:
+          type:
+            - string
+            - "null"
+        latitude:
+          type:
+            - number
+            - "null"
+          minimum: -90
+          maximum: 90
+          description: Wajib diisi bersama longitude
+        longitude:
+          type:
+            - number
+            - "null"
+          minimum: -180
+          maximum: 180
+        phone:
+          type:
+            - string
+            - "null"
+          maxLength: 30
+        mapsUrl:
+          type:
+            - string
+            - "null"
+          format: uri
+        sortOrder:
+          type: integer
+          default: 0
+        isActive:
+          type: boolean
+          default: true
+    Service:
+      allOf:
+        - $ref: "#/components/schemas/ServiceInput"
+        - type: object
+          properties:
+            id:
+              type: integer
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+    Location:
+      allOf:
+        - $ref: "#/components/schemas/LocationInput"
+        - type: object
+          properties:
+            id:
+              type: integer
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+    PublicLocation:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/LocationType"
+        address:
+          type: string
+        city:
+          type: string
+        province:
+          type:
+            - string
+            - "null"
+        latitude:
+          type:
+            - number
+            - "null"
+        longitude:
+          type:
+            - number
+            - "null"
+        phone:
+          type:
+            - string
+            - "null"
+        mapsUrl:
+          type:
+            - string
+            - "null"
   responses:
     ValidationError:
       description: Data tidak valid

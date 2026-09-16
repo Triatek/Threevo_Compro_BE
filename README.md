@@ -119,5 +119,8 @@ docs/            BACKEND_SPEC.md, openapi.yaml
 | GET | `/api/v1/site` | Settings publik, banner, klien, testimoni aktif, layanan featured |
 | GET/PUT | `/api/v1/admin/settings` | Pengaturan situs (SUPER_ADMIN) |
 | CRUD + reorder | `/api/v1/admin/banners`, `/clients`, `/testimonials` | Konten Home |
+| GET | `/api/v1/services`, `/api/v1/services/:slug` | Layanan aktif |
+| GET | `/api/v1/locations?city=&type=` | Lokasi aktif untuk peta |
+| CRUD + reorder | `/api/v1/admin/services` (soft delete), `/api/v1/admin/locations` | |
 
 Endpoint lain ditambahkan per fase (lihat checklist di spec).

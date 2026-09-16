@@ -6,6 +6,8 @@ import authRoutes from '../modules/auth/auth.routes.js';
 import bannersRoutes from '../modules/banners/banners.routes.js';
 import clientsRoutes from '../modules/clients/clients.routes.js';
 import healthRoutes from '../modules/health/health.routes.js';
+import { adminLocationsRouter, publicLocationsRouter } from '../modules/locations/locations.routes.js';
+import { adminServicesRouter, publicServicesRouter } from '../modules/services/services.routes.js';
 import settingsRoutes from '../modules/settings/settings.routes.js';
 import siteRoutes from '../modules/site/site.routes.js';
 import testimonialsRoutes from '../modules/testimonials/testimonials.routes.js';
@@ -16,6 +18,8 @@ const router = Router();
 // ---------- Public ----------
 router.use('/health', healthRoutes);
 router.use('/site', siteRoutes);
+router.use('/services', publicServicesRouter);
+router.use('/locations', publicLocationsRouter);
 
 // ---------- Auth ----------
 router.use('/auth', noStore, authRoutes);
@@ -28,6 +32,8 @@ adminRouter.use('/settings', settingsRoutes);
 adminRouter.use('/banners', bannersRoutes);
 adminRouter.use('/clients', clientsRoutes);
 adminRouter.use('/testimonials', testimonialsRoutes);
+adminRouter.use('/services', adminServicesRouter);
+adminRouter.use('/locations', adminLocationsRouter);
 adminRouter.use('/users', usersRoutes);
 adminRouter.use('/audit-logs', auditLogsRoutes);
 
