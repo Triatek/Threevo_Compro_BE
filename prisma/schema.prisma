@@ -1,0 +1,252 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  EDITOR
+}
+
+enum ArticleStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum LocationType {
+  WAREHOUSE
+  OFFICE
+  HUB
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  CLOSED
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  name         String    @db.VarChar(100)
+  email        String    @unique @db.VarChar(150)
+  passwordHash String    @map("password_hash")
+  role         Role      @default(EDITOR)
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  articles      Article[]
+  media         Media[]
+  auditLogs     AuditLog[]
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        Int       @id @default(autoincrement())
+  tokenHash String    @unique @map("token_hash")
+  userId    Int       @map("user_id")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  userAgent String?   @map("user_agent") @db.VarChar(300)
+  ipAddress String?   @map("ip_address") @db.VarChar(45)
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(100)
+  slug      String   @unique @db.VarChar(120)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  articles Article[]
+
+  @@map("categories")
+}
+
+model Article {
+  id              Int           @id @default(autoincrement())
+  title           String        @db.VarChar(200)
+  slug            String        @unique @db.VarChar(220)
+  excerpt         String?       @db.VarChar(500)
+  content         String        @db.Text
+  coverImage      String?       @map("cover_image")
+  status          ArticleStatus @default(DRAFT)
+  publishedAt     DateTime?     @map("published_at")
+  metaTitle       String?       @map("meta_title") @db.VarChar(70)
+  metaDescription String?       @map("meta_description") @db.VarChar(160)
+  viewCount       Int           @default(0) @map("view_count")
+  categoryId      Int?          @map("category_id")
+  authorId        Int?          @map("author_id")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  deletedAt       DateTime?     @map("deleted_at")
+
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  author   User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([status, publishedAt])
+  @@index([categoryId])
+  @@map("articles")
+}
+
+model Service {
+  id              Int       @id @default(autoincrement())
+  name            String    @db.VarChar(150)
+  slug            String    @unique @db.VarChar(170)
+  shortDesc       String?   @map("short_desc") @db.VarChar(300)
+  content         String?   @db.Text
+  icon            String?
+  image           String?
+  metaTitle       String?   @map("meta_title") @db.VarChar(70)
+  metaDescription String?   @map("meta_description") @db.VarChar(160)
+  isFeatured      Boolean   @default(false) @map("is_featured")
+  sortOrder       Int       @default(0) @map("sort_order")
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  @@index([isActive, sortOrder])
+  @@map("services")
+}
+
+model Location {
+  id        Int          @id @default(autoincrement())
+  name      String       @db.VarChar(150)
+  type      LocationType @default(WAREHOUSE)
+  address   String       @db.VarChar(300)
+  city      String       @db.VarChar(100)
+  province  String?      @db.VarChar(100)
+  latitude  Decimal?     @db.Decimal(10, 7)
+  longitude Decimal?     @db.Decimal(10, 7)
+  phone     String?      @db.VarChar(30)
+  mapsUrl   String?      @map("maps_url")
+  sortOrder Int          @default(0) @map("sort_order")
+  isActive  Boolean      @default(true) @map("is_active")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  @@index([isActive, city])
+  @@map("locations")
+}
+
+model Client {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(150)
+  logo      String
+  website   String?
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("clients")
+}
+
+model Testimonial {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(100)
+  position  String?  @db.VarChar(100)
+  company   String?  @db.VarChar(150)
+  message   String   @db.Text
+  photo     String?
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("testimonials")
+}
+
+model Banner {
+  id        Int      @id @default(autoincrement())
+  title     String   @db.VarChar(150)
+  subtitle  String?  @db.VarChar(300)
+  image     String
+  ctaText   String?  @map("cta_text") @db.VarChar(50)
+  ctaLink   String?  @map("cta_link")
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("banners")
+}
+
+model Setting {
+  key       String   @id @db.VarChar(100)
+  value     String   @db.Text
+  isPublic  Boolean  @default(true) @map("is_public")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+model Lead {
+  id              Int        @id @default(autoincrement())
+  name            String     @db.VarChar(100)
+  email           String     @db.VarChar(150)
+  phone           String?    @db.VarChar(30)
+  company         String?    @db.VarChar(150)
+  serviceInterest String?    @map("service_interest") @db.VarChar(150)
+  message         String     @db.Text
+  status          LeadStatus @default(NEW)
+  notes           String?    @db.Text
+  source          String?    @db.VarChar(100)
+  ipAddress       String?    @map("ip_address") @db.VarChar(45)
+  userAgent       String?    @map("user_agent") @db.VarChar(300)
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+  deletedAt       DateTime?  @map("deleted_at")
+
+  @@index([status, createdAt])
+  @@map("leads")
+}
+
+model Media {
+  id           Int      @id @default(autoincrement())
+  filename     String
+  originalName String   @map("original_name")
+  url          String
+  mimeType     String   @map("mime_type") @db.VarChar(100)
+  size         Int
+  width        Int?
+  height       Int?
+  alt          String?  @db.VarChar(200)
+  uploadedById Int?     @map("uploaded_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  uploadedBy User? @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@map("media")
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?     @map("user_id")
+  action    String   @db.VarChar(50)
+  entity    String   @db.VarChar(50)
+  entityId  String?  @map("entity_id") @db.VarChar(50)
+  metadata  Json?
+  ipAddress String?  @map("ip_address") @db.VarChar(45)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

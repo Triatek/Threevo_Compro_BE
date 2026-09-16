@@ -1,11 +1,5 @@
-import { success } from "zod";
+import { NotFoundError } from '../utils/AppError.js';
 
-export function notFound(req,res){
-    res.status(404).json({
-        success:false,
-        error:{
-            code:'NOT_FOUND',
-            message:`Endpoint ${req.method} ${req.originalUrl} tidak ditemukan`,
-        }
-    })
+export function notFound(req, res, next) {
+  next(new NotFoundError(`Endpoint ${req.method} ${req.originalUrl} tidak ditemukan`));
 }

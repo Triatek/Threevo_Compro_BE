@@ -1,0 +1,138 @@
+openapi: 3.1.0
+info:
+  title: Threevo Compro API
+  version: 1.0.0
+  description: |
+    REST API untuk website company profile Threevo (CMS, lead, proxy tracking).
+
+    Semua respons memakai format standar:
+    - Sukses: `{ "success": true, "message"?: string, "data": ..., "meta"?: {...} }`
+    - Error: `{ "success": false, "error": { "code", "message", "details"? } }`
+servers:
+  - url: http://localhost:4000/api/v1
+    description: Development
+
+tags:
+  - name: System
+
+paths:
+  /health:
+    get:
+      tags: [System]
+      summary: Health check (termasuk koneksi database)
+      responses:
+        '200':
+          description: Server dan database sehat
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Health'
+        '503':
+          description: Database tidak dapat dihubungi
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: SERVICE_UNAVAILABLE
+                  message: Layanan sedang tidak tersedia
+                  details:
+                    - field: database
+                      message: Database tidak dapat dihubungi
+
+components:
+  schemas:
+    SuccessResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        message:
+          type: string
+        data: {}
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    ErrorResponse:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          const: false
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - BAD_REQUEST
+                - INVALID_JSON
+                - UNAUTHORIZED
+                - FORBIDDEN
+                - NOT_FOUND
+                - CONFLICT
+                - PAYLOAD_TOO_LARGE
+                - VALIDATION_ERROR
+                - TOO_MANY_REQUESTS
+                - INTERNAL_SERVER_ERROR
+                - SERVICE_UNAVAILABLE
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  location:
+                    type: string
+                    enum: [body, query, params]
+                  field:
+                    type: string
+                  message:
+                    type: string
+
+    PaginationMeta:
+      type: object
+      properties:
+        page: { type: integer, example: 1 }
+        limit: { type: integer, example: 10 }
+        total: { type: integer, example: 42 }
+        totalPages: { type: integer, example: 5 }
+        hasNextPage: { type: boolean }
+        hasPrevPage: { type: boolean }
+
+    Health:
+      type: object
+      properties:
+        status: { type: string, example: OK }
+        uptime: { type: integer, description: Detik sejak server berjalan }
+        timestamp: { type: string, format: date-time }
+        services:
+          type: object
+          properties:
+            database: { type: string, enum: [up, down] }
+
+  responses:
+    ValidationError:
+      description: Data tidak valid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: Rate limit terlampaui
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
