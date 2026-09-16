@@ -16,6 +16,7 @@ import mediaRoutes from '../modules/media/media.routes.js';
 import settingsRoutes from '../modules/settings/settings.routes.js';
 import siteRoutes from '../modules/site/site.routes.js';
 import testimonialsRoutes from '../modules/testimonials/testimonials.routes.js';
+import trackingRoutes from '../modules/tracking/tracking.routes.js';
 import usersRoutes from '../modules/users/users.routes.js';
 
 const router = Router();
@@ -28,6 +29,7 @@ router.use('/locations', publicLocationsRouter);
 router.use('/categories', publicCategoriesRouter);
 router.use('/articles', publicArticlesRouter);
 router.use('/leads', publicLeadsRouter);
+router.use('/tracking', trackingRoutes);
 
 // ---------- Auth ----------
 router.use('/auth', noStore, authRoutes);

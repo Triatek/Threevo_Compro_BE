@@ -132,5 +132,6 @@ docs/            BACKEND_SPEC.md, openapi.yaml
 | POST | `/api/v1/leads` | Form Contact Us (rate limit, honeypot, CAPTCHA opsional) |
 | GET/PATCH/DELETE | `/api/v1/admin/leads` + `GET /export` | Kelola & ekspor CSV lead; hapus khusus SUPER_ADMIN |
 | GET | `/api/v1/admin/dashboard` | Statistik artikel & lead |
+| GET | `/api/v1/tracking/:awb` | Cek resi via TMS (mock: resi berawalan `TEST`) |
 
 Endpoint lain ditambahkan per fase (lihat checklist di spec).
