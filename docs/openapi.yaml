@@ -26,6 +26,8 @@ tags:
   - name: Admin - Categories
   - name: Admin - Articles
   - name: Admin - Media
+  - name: Admin - Dashboard
+  - name: Admin - Leads
 paths:
   /health:
     get:
@@ -1950,6 +1952,241 @@ paths:
                         type: "null"
         "404":
           $ref: "#/components/responses/NotFound"
+  /leads:
+    post:
+      tags:
+        - Public
+      summary: Kirim form Contact Us
+      description: Rate limit 5 request / 15 menit per IP. Query `utm_source` (opsional) disimpan sebagai sumber; jika tidak ada dipakai header Referer. Email notifikasi dikirim di belakang layar.
+      parameters:
+        - name: utm_source
+          in: query
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadInput"
+      responses:
+        "201":
+          description: Pesan diterima
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "400":
+          description: Verifikasi CAPTCHA gagal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /admin/dashboard:
+    get:
+      tags:
+        - Admin - Dashboard
+      summary: Ringkasan untuk dashboard admin
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Dashboard"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /admin/leads:
+    get:
+      tags:
+        - Admin - Leads
+      summary: Daftar lead (tanpa pesan)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/LeadStatus"
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Cari di nama, email, perusahaan, telepon
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: YYYY-MM-DD (WIB, inklusif)
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: YYYY-MM-DD (WIB, inklusif)
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Lead"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/leads/export:
+    get:
+      tags:
+        - Admin - Leads
+      summary: Ekspor CSV (filter sama dengan daftar, maks 10.000 baris)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/LeadStatus"
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Cari di nama, email, perusahaan, telepon
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: YYYY-MM-DD (WIB, inklusif)
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: YYYY-MM-DD (WIB, inklusif)
+      responses:
+        "200":
+          description: File CSV UTF-8 dengan BOM
+          content:
+            text/csv:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /admin/leads/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags:
+        - Admin - Leads
+      summary: Detail lead
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Lead"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Admin - Leads
+      summary: Ubah status / catatan
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                status:
+                  $ref: "#/components/schemas/LeadStatus"
+                notes:
+                  type:
+                    - string
+                    - "null"
+                  maxLength: 5000
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Lead"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - Admin - Leads
+      summary: Hapus lead (soft delete, SUPER_ADMIN)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   schemas:
     SuccessResponse:
@@ -2754,6 +2991,136 @@ components:
         createdAt:
           type: string
           format: date-time
+    LeadStatus:
+      type: string
+      enum:
+        - NEW
+        - CONTACTED
+        - CLOSED
+    LeadInput:
+      type: object
+      required:
+        - name
+        - email
+        - message
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          maxLength: 30
+          example: 0812-3456-7890
+        company:
+          type: string
+          maxLength: 150
+        serviceInterest:
+          type: string
+          maxLength: 150
+          example: Fulfillment
+        message:
+          type: string
+          minLength: 10
+          maxLength: 5000
+        website:
+          type: string
+          description: "Honeypot: sembunyikan field ini di form dan biarkan kosong"
+        captchaToken:
+          type: string
+          description: Token Cloudflare Turnstile (wajib jika TURNSTILE_SECRET_KEY diset di server)
+    Lead:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type:
+            - string
+            - "null"
+        company:
+          type:
+            - string
+            - "null"
+        serviceInterest:
+          type:
+            - string
+            - "null"
+        message:
+          type: string
+          description: Tidak ada di endpoint daftar
+        status:
+          $ref: "#/components/schemas/LeadStatus"
+        notes:
+          type:
+            - string
+            - "null"
+        source:
+          type:
+            - string
+            - "null"
+        ipAddress:
+          type:
+            - string
+            - "null"
+        userAgent:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Dashboard:
+      type: object
+      properties:
+        articles:
+          type: object
+          properties:
+            DRAFT:
+              type: integer
+            PUBLISHED:
+              type: integer
+            total:
+              type: integer
+        leads:
+          type: object
+          properties:
+            NEW:
+              type: integer
+            CONTACTED:
+              type: integer
+            CLOSED:
+              type: integer
+            total:
+              type: integer
+        leadsLast30Days:
+          type: array
+          minItems: 30
+          maxItems: 30
+          description: Urut dari yang terlama; tanggal dalam WIB
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              count:
+                type: integer
+        recentLeads:
+          type: array
+          maxItems: 5
+          items:
+            $ref: "#/components/schemas/Lead"
   responses:
     ValidationError:
       description: Data tidak valid

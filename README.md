@@ -129,5 +129,8 @@ docs/            BACKEND_SPEC.md, openapi.yaml
 | CRUD | `/api/v1/admin/articles` + `PATCH /:id/publish`, `/:id/unpublish` | Soft delete |
 | POST/GET/DELETE | `/api/v1/admin/media` | Upload gambar (multipart `file`, `alt`) → WebP |
 | GET | `/uploads/YYYY/MM/<uuid>.webp` | File hasil upload (cache 1 tahun) |
+| POST | `/api/v1/leads` | Form Contact Us (rate limit, honeypot, CAPTCHA opsional) |
+| GET/PATCH/DELETE | `/api/v1/admin/leads` + `GET /export` | Kelola & ekspor CSV lead; hapus khusus SUPER_ADMIN |
+| GET | `/api/v1/admin/dashboard` | Statistik artikel & lead |
 
 Endpoint lain ditambahkan per fase (lihat checklist di spec).

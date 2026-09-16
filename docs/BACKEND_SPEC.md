@@ -634,7 +634,7 @@ Dockerfile, compose produksi, CI GitHub Actions, script backup, `docs/DEPLOYMENT
 - [x] Fase 3 — Services & Locations
 - [x] Fase 4 — Categories & Articles
 - [x] Fase 5 — Media upload
-- [ ] Fase 6 — Leads
+- [x] Fase 6 — Leads
 - [ ] Fase 7 — Tracking
 - [ ] Fase 8 — SEO & dokumentasi
 - [ ] Fase 9 — Kesiapan produksi
