@@ -23,6 +23,8 @@ tags:
   - name: Admin - Testimonials
   - name: Admin - Services
   - name: Admin - Locations
+  - name: Admin - Categories
+  - name: Admin - Articles
 paths:
   /health:
     get:
@@ -1439,6 +1441,417 @@ paths:
                         type: "null"
         "404":
           $ref: "#/components/responses/NotFound"
+  /categories:
+    get:
+      tags:
+        - Public
+      summary: Semua kategori + jumlah artikel published
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Category"
+  /articles:
+    get:
+      tags:
+        - Public
+      summary: Daftar artikel published (tanpa content)
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Slug kategori
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Cari di judul & excerpt
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ArticleSummary"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /articles/{slug}:
+    get:
+      tags:
+        - Public
+      summary: Detail artikel published + 3 artikel terkait
+      description: Setiap request menambah viewCount.
+      parameters:
+        - $ref: "#/components/parameters/Slug"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ArticleDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/categories:
+    get:
+      tags:
+        - Admin - Categories
+      summary: Daftar kategori
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Category"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Admin - Categories
+      summary: Buat kategori
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/CategoryInput"
+                - required:
+                    - name
+      responses:
+        "201":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Category"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/categories/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags:
+        - Admin - Categories
+      summary: Detail kategori
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Category"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Admin - Categories
+      summary: Ubah kategori
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/CategoryInput"
+                - minProperties: 1
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Category"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - Admin - Categories
+      summary: Hapus kategori (409 jika masih dipakai artikel)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /admin/articles:
+    get:
+      tags:
+        - Admin - Articles
+      summary: Daftar artikel (tanpa content)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Q"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ArticleStatus"
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Slug kategori
+        - name: categoryId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Article"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Admin - Articles
+      summary: Buat artikel (default DRAFT)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ArticleInput"
+                - required:
+                    - title
+                    - content
+      responses:
+        "201":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Article"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/articles/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags:
+        - Admin - Articles
+      summary: Detail artikel
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Article"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Admin - Articles
+      summary: Ubah artikel
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ArticleInput"
+                - minProperties: 1
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Article"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - Admin - Articles
+      summary: Hapus artikel (soft delete)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/articles/{id}/publish:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    patch:
+      tags:
+        - Admin - Articles
+      summary: Publikasikan (publishedAt diisi jika kosong)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Article"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/articles/{id}/unpublish:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    patch:
+      tags:
+        - Admin - Articles
+      summary: Kembalikan ke draft
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Article"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   schemas:
     SuccessResponse:
@@ -2024,6 +2437,181 @@ components:
           type:
             - string
             - "null"
+    ArticleStatus:
+      type: string
+      enum:
+        - DRAFT
+        - PUBLISHED
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        articleCount:
+          type: integer
+          description: "Publik: jumlah artikel published. Admin: semua artikel yang tidak dihapus."
+    CategoryInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        slug:
+          type: string
+          description: Opsional, otomatis dari nama
+    ArticleSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        slug:
+          type: string
+        excerpt:
+          type:
+            - string
+            - "null"
+        coverImage:
+          type:
+            - string
+            - "null"
+        publishedAt:
+          type: string
+          format: date-time
+        category:
+          type:
+            - object
+            - "null"
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            slug:
+              type: string
+        author:
+          type:
+            - object
+            - "null"
+          properties:
+            name:
+              type: string
+    ArticleDetail:
+      allOf:
+        - $ref: "#/components/schemas/ArticleSummary"
+        - type: object
+          properties:
+            content:
+              type: string
+              description: HTML yang sudah disanitasi
+            metaTitle:
+              type:
+                - string
+                - "null"
+            metaDescription:
+              type:
+                - string
+                - "null"
+            viewCount:
+              type: integer
+            updatedAt:
+              type: string
+              format: date-time
+            related:
+              type: array
+              maxItems: 3
+              items:
+                $ref: "#/components/schemas/ArticleSummary"
+              description: Artikel lain di kategori yang sama
+    ArticleInput:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 200
+        slug:
+          type: string
+          description: Opsional. Otomatis dari judul (unik, -2, -3). Slug eksplisit yang bentrok → 409.
+        excerpt:
+          type:
+            - string
+            - "null"
+          maxLength: 500
+        content:
+          type: string
+          description: HTML; disanitasi di server
+        coverImage:
+          oneOf:
+            - $ref: "#/components/schemas/ImageUrl"
+            - type: "null"
+        status:
+          $ref: "#/components/schemas/ArticleStatus"
+        publishedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: Kosong + PUBLISHED → diisi waktu sekarang. Tanggal di masa depan = terjadwal.
+        metaTitle:
+          type:
+            - string
+            - "null"
+          maxLength: 70
+        metaDescription:
+          type:
+            - string
+            - "null"
+          maxLength: 160
+        categoryId:
+          type:
+            - integer
+            - "null"
+    Article:
+      allOf:
+        - $ref: "#/components/schemas/ArticleInput"
+        - type: object
+          properties:
+            id:
+              type: integer
+            viewCount:
+              type: integer
+            authorId:
+              type:
+                - integer
+                - "null"
+            category:
+              type:
+                - object
+                - "null"
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+                slug:
+                  type: string
+            author:
+              type:
+                - object
+                - "null"
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
   responses:
     ValidationError:
       description: Data tidak valid

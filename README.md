@@ -122,5 +122,10 @@ docs/            BACKEND_SPEC.md, openapi.yaml
 | GET | `/api/v1/services`, `/api/v1/services/:slug` | Layanan aktif |
 | GET | `/api/v1/locations?city=&type=` | Lokasi aktif untuk peta |
 | CRUD + reorder | `/api/v1/admin/services` (soft delete), `/api/v1/admin/locations` | |
+| GET | `/api/v1/categories` | Kategori + jumlah artikel published |
+| GET | `/api/v1/articles?page=&limit=&category=&q=` | Artikel published |
+| GET | `/api/v1/articles/:slug` | Detail + 3 artikel terkait (menambah viewCount) |
+| CRUD | `/api/v1/admin/categories` | Hapus ditolak (409) jika masih dipakai |
+| CRUD | `/api/v1/admin/articles` + `PATCH /:id/publish`, `/:id/unpublish` | Soft delete |
 
 Endpoint lain ditambahkan per fase (lihat checklist di spec).

@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { requireAuth } from '../middlewares/auth.js';
 import { noStore } from '../middlewares/cacheControl.js';
+import { adminArticlesRouter, publicArticlesRouter } from '../modules/articles/articles.routes.js';
 import auditLogsRoutes from '../modules/auditLogs/auditLogs.routes.js';
 import authRoutes from '../modules/auth/auth.routes.js';
 import bannersRoutes from '../modules/banners/banners.routes.js';
+import { adminCategoriesRouter, publicCategoriesRouter } from '../modules/categories/categories.routes.js';
 import clientsRoutes from '../modules/clients/clients.routes.js';
 import healthRoutes from '../modules/health/health.routes.js';
 import { adminLocationsRouter, publicLocationsRouter } from '../modules/locations/locations.routes.js';
@@ -20,6 +22,8 @@ router.use('/health', healthRoutes);
 router.use('/site', siteRoutes);
 router.use('/services', publicServicesRouter);
 router.use('/locations', publicLocationsRouter);
+router.use('/categories', publicCategoriesRouter);
+router.use('/articles', publicArticlesRouter);
 
 // ---------- Auth ----------
 router.use('/auth', noStore, authRoutes);
@@ -34,6 +38,8 @@ adminRouter.use('/clients', clientsRoutes);
 adminRouter.use('/testimonials', testimonialsRoutes);
 adminRouter.use('/services', adminServicesRouter);
 adminRouter.use('/locations', adminLocationsRouter);
+adminRouter.use('/categories', adminCategoriesRouter);
+adminRouter.use('/articles', adminArticlesRouter);
 adminRouter.use('/users', usersRoutes);
 adminRouter.use('/audit-logs', auditLogsRoutes);
 
