@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import multer from 'multer';
 import { ZodError } from 'zod';
 import { env } from '../config/env.js';
 import { formatZodIssues } from '../config/zod.js';
@@ -56,6 +57,21 @@ function normalizeError(err) {
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     const mapped = fromPrismaError(err);
     if (mapped) return mapped;
+  }
+
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return {
+        statusCode: 413,
+        code: 'PAYLOAD_TOO_LARGE',
+        message: `Ukuran file maksimal ${env.UPLOAD_MAX_SIZE_MB} MB`,
+      };
+    }
+    return {
+      statusCode: 400,
+      code: 'BAD_REQUEST',
+      message: 'Unggahan tidak valid. Kirim satu file pada field "file"',
+    };
   }
 
   // Errors raised by express.json() (body-parser)

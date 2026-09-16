@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 import { env } from './config/env.js';
 import { logger } from './lib/logger.js';
+import { UPLOAD_ROOT, UPLOAD_URL_PATH } from './lib/storage.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { notFound } from './middlewares/notFound.js';
 import { globalLimiter } from './middlewares/rateLimiter.js';
@@ -57,6 +58,22 @@ app.use(
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
+
+// Uploaded files: file names are random UUIDs, so they can be cached forever.
+app.use(
+  UPLOAD_URL_PATH,
+  (req, res, next) => {
+    // Allow the frontend (other origin) to embed the images.
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  },
+  express.static(UPLOAD_ROOT, {
+    index: false,
+    dotfiles: 'deny',
+    immutable: true,
+    maxAge: '1y',
+  }),
+);
 
 app.use(env.API_PREFIX, globalLimiter, routes);
 

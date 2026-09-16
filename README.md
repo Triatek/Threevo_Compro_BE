@@ -127,5 +127,7 @@ docs/            BACKEND_SPEC.md, openapi.yaml
 | GET | `/api/v1/articles/:slug` | Detail + 3 artikel terkait (menambah viewCount) |
 | CRUD | `/api/v1/admin/categories` | Hapus ditolak (409) jika masih dipakai |
 | CRUD | `/api/v1/admin/articles` + `PATCH /:id/publish`, `/:id/unpublish` | Soft delete |
+| POST/GET/DELETE | `/api/v1/admin/media` | Upload gambar (multipart `file`, `alt`) → WebP |
+| GET | `/uploads/YYYY/MM/<uuid>.webp` | File hasil upload (cache 1 tahun) |
 
 Endpoint lain ditambahkan per fase (lihat checklist di spec).

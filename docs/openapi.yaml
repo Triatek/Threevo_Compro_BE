@@ -25,6 +25,7 @@ tags:
   - name: Admin - Locations
   - name: Admin - Categories
   - name: Admin - Articles
+  - name: Admin - Media
 paths:
   /health:
     get:
@@ -1852,6 +1853,103 @@ paths:
                         $ref: "#/components/schemas/Article"
         "404":
           $ref: "#/components/responses/NotFound"
+  /admin/media:
+    get:
+      tags:
+        - Admin - Media
+      summary: Daftar media
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Q"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Media"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Admin - Media
+      summary: Unggah gambar
+      description: JPG/PNG/WebP (isi file diverifikasi), maks UPLOAD_MAX_SIZE_MB. Dikonversi ke WebP kualitas 82, lebar maks 1920 px, metadata EXIF dihapus. SVG tidak didukung.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                alt:
+                  type: string
+                  maxLength: 200
+      responses:
+        "201":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Media"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "413":
+          description: File terlalu besar
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/media/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    delete:
+      tags:
+        - Admin - Media
+      summary: Hapus media beserta file fisiknya
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
   schemas:
     SuccessResponse:
@@ -2612,6 +2710,50 @@ components:
             updatedAt:
               type: string
               format: date-time
+    Media:
+      type: object
+      properties:
+        id:
+          type: integer
+        filename:
+          type: string
+          example: 2026/01/3f2a...webp
+        originalName:
+          type: string
+        url:
+          type: string
+          format: uri
+          description: URL publik; pakai nilai ini di field gambar konten
+        mimeType:
+          type: string
+          example: image/webp
+        size:
+          type: integer
+          description: Byte setelah konversi
+        width:
+          type: integer
+        height:
+          type: integer
+        alt:
+          type:
+            - string
+            - "null"
+        uploadedById:
+          type:
+            - integer
+            - "null"
+        uploadedBy:
+          type:
+            - object
+            - "null"
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        createdAt:
+          type: string
+          format: date-time
   responses:
     ValidationError:
       description: Data tidak valid

@@ -10,6 +10,7 @@ import clientsRoutes from '../modules/clients/clients.routes.js';
 import healthRoutes from '../modules/health/health.routes.js';
 import { adminLocationsRouter, publicLocationsRouter } from '../modules/locations/locations.routes.js';
 import { adminServicesRouter, publicServicesRouter } from '../modules/services/services.routes.js';
+import mediaRoutes from '../modules/media/media.routes.js';
 import settingsRoutes from '../modules/settings/settings.routes.js';
 import siteRoutes from '../modules/site/site.routes.js';
 import testimonialsRoutes from '../modules/testimonials/testimonials.routes.js';
@@ -40,6 +41,7 @@ adminRouter.use('/services', adminServicesRouter);
 adminRouter.use('/locations', adminLocationsRouter);
 adminRouter.use('/categories', adminCategoriesRouter);
 adminRouter.use('/articles', adminArticlesRouter);
+adminRouter.use('/media', mediaRoutes);
 adminRouter.use('/users', usersRoutes);
 adminRouter.use('/audit-logs', auditLogsRoutes);
 
