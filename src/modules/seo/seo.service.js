@@ -4,13 +4,20 @@ import { publishedArticleWhere } from '../articles/articles.filters.js';
 
 /**
  * Frontend routes used in the sitemap.
- * TODO(frontend): keep these in sync with the React router paths.
+ * Keep in sync with `src/routes/paths.js` in the frontend repository.
  */
 export const FRONTEND_ROUTES = Object.freeze({
-  staticPages: ['/', '/layanan', '/lokasi', '/berita', '/kontak', '/cek-resi'],
+  staticPages: ['/', '/tentang-kami', '/layanan', '/harga', '/lokasi', '/berita', '/kontak'],
   service: (slug) => `/layanan/${slug}`,
   article: (slug) => `/berita/${slug}`,
 });
+
+/**
+ * The pricing content is stored as a service but has its own page at /harga,
+ * and the frontend redirects /layanan/paket-harga there. Listing both would
+ * put duplicate content in the sitemap.
+ */
+const PRICING_SERVICE_SLUG = 'paket-harga';
 
 const escapeXml = (value) =>
   String(value)
@@ -29,7 +36,7 @@ export async function buildSitemap({ siteUrl = env.SITE_URL } = {}) {
   const base = siteUrl.replace(/\/+$/, '');
   const [services, articles] = await Promise.all([
     prisma.service.findMany({
-      where: { isActive: true, deletedAt: null },
+      where: { isActive: true, deletedAt: null, slug: { not: PRICING_SERVICE_SLUG } },
       select: { slug: true, updatedAt: true },
       orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
     }),
