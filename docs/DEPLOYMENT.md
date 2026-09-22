@@ -46,8 +46,13 @@ cp .env.production.example .env.production
 nano .env.production            # isi semua nilai
 chmod 600 .env.production
 
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
-docker compose -f docker-compose.prod.yml logs -f api
+# Semua perintah compose WAJIB memakai --env-file, karena docker-compose.prod.yml
+# menginterpolasi ${POSTGRES_USER} dan ${POSTGRES_PASSWORD}. Tanpa flag ini Compose
+# mencari file bernama ".env" dan gagal dengan "required variable ... is missing".
+CO="docker compose -f docker-compose.prod.yml --env-file .env.production"
+
+$CO up -d --build
+$CO logs -f api
 ```
 
 Container `api` otomatis menjalankan `prisma migrate deploy` sebelum start
@@ -55,7 +60,6 @@ Container `api` otomatis menjalankan `prisma migrate deploy` sebelum start
 [bagian 2b](#2b-urutan-seed) untuk penjelasan tiap langkah):
 
 ```bash
-CO="docker compose -f docker-compose.prod.yml"
 $CO exec api node prisma/seed.js            # 1. admin, settings, kategori, struktur dasar
 $CO exec api node prisma/seed-content.js    # 2. konten asli Threevo (layanan, lokasi, harga)
 $CO exec api node prisma/seed-articles.js   # 3. artikel contoh - opsional
@@ -214,7 +218,7 @@ Format `pg_dump --format=custom`, menyimpan 14 backup terakhir (ubah dengan `KEE
 ```
 Untuk Docker, jalankan dari host dengan `DATABASE_URL` yang mengarah ke container, atau:
 ```bash
-docker compose -f docker-compose.prod.yml exec -T postgres \
+docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres \
   pg_dump -U threevo -d threevo_db --format=custom > /var/backups/threevo/threevo_$(date +%F).dump
 ```
 
@@ -233,7 +237,9 @@ Uji restore ke database terpisah secara berkala.
 
 - **Uptime monitor** (UptimeRobot, Better Stack, dll.) ke `https://api.threevo.id/api/v1/health`
   tiap 1–5 menit. Endpoint mengembalikan **503** jika database tidak bisa dihubungi.
-- **Log**: format JSON (pino). Docker: `docker compose logs -f api`; PM2: `pm2 logs`.
+- **Log**: format JSON (pino). Docker:
+  `docker compose -f docker-compose.prod.yml --env-file .env.production logs -f api`;
+  PM2: `pm2 logs`.
   Setiap request punya `X-Request-Id` untuk mencari log terkait.
 - **Error tracking**: disarankan Sentry (`@sentry/node`). Ini dependency baru, jadi perlu
   disetujui dulu sebelum ditambahkan.
