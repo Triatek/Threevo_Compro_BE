@@ -114,7 +114,7 @@ Buat `.env.example` (di-commit) dan `.env` (tidak di-commit). Validasi semua di
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE` | opsional | jika kosong, email hanya di-log (mode dev) |
 | `MAIL_FROM` | "Threevo <no-reply@example.com>" | |
 | `LEAD_NOTIFICATION_EMAIL` | opsional | fallback jika setting kosong |
-| `TURNSTILE_SECRET_KEY` | opsional | jika kosong, verifikasi CAPTCHA dilewati (log warning) |
+| `TURNSTILE_SECRET_KEY` | wajib di production | di luar production, jika kosong verifikasi CAPTCHA dilewati (log warning); di production server menolak start |
 | `UPLOAD_DIR` | uploads | |
 | `UPLOAD_MAX_SIZE_MB` | 5 | |
 | `TRACKING_PROVIDER` | mock | `mock` atau `http` |
