@@ -80,6 +80,19 @@ const envSchema = z
         message: 'Wajib diisi jika TRACKING_PROVIDER=http',
       });
     }
+
+    // Without a secret, captcha verification silently passes everything (see
+    // lib/captcha.js). In production that would leave the lead form open to bots
+    // with nothing but one warning line in the log, so refuse to start instead.
+    if (value.NODE_ENV === 'production' && !value.TURNSTILE_SECRET_KEY) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['TURNSTILE_SECRET_KEY'],
+        message:
+          'Wajib diisi di production, jika tidak verifikasi CAPTCHA dilewati. ' +
+          'Untuk demo tanpa domain, pakai kunci uji Cloudflare 1x0000000000000000000000000000000AA',
+      });
+    }
   })
   .transform((value) => {
     const isProduction = value.NODE_ENV === 'production';

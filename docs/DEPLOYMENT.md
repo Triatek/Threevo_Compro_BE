@@ -28,7 +28,9 @@ Contoh lengkap: `.env.production.example`.
 - [ ] `TRUST_PROXY=1` (di belakang Nginx; tanpa ini rate limit menganggap semua user satu IP)
 - [ ] `COOKIE_SECURE=true`, `COOKIE_DOMAIN=.threevo.id`
 - [ ] SMTP terisi dan `LEAD_NOTIFICATION_EMAIL` atau setting `lead_notification_email` diisi
-- [ ] `TURNSTILE_SECRET_KEY` diisi (dan site key di frontend)
+- [ ] `TURNSTILE_SECRET_KEY` diisi (dan site key di frontend). **Wajib** — server
+      menolak start kalau kosong. Untuk demo tanpa domain, pakai kunci uji
+      `1x0000000000000000000000000000000AA` (semua token lolos, ada peringatan di log)
 - [ ] `TRACKING_PROVIDER=http` + `TRACKING_API_URL`/`TRACKING_API_KEY` setelah `normalize()` disesuaikan
 - [ ] `ENABLE_DOCS=false` (kecuali memang ingin Swagger publik)
 - [ ] `SEED_ADMIN_PASSWORD` diisi untuk seed pertama, lalu **hapus** dari env setelahnya

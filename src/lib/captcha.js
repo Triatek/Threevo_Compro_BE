@@ -6,11 +6,29 @@ const TIMEOUT_MS = 5000;
 
 let warnedMissingSecret = false;
 
+/** Cloudflare's documented dummy secrets, which accept (or reject) any token. */
+const TEST_SECRET_KEYS = new Set([
+  '1x0000000000000000000000000000000AA',
+  '2x0000000000000000000000000000000AA',
+  '3x0000000000000000000000000000000AA',
+]);
+
+// A real secret is required in production (enforced in config/env.js), but a test
+// key satisfies that check while accepting every token. Useful for a demo without
+// a domain, dangerous if it is still there once the site takes real traffic.
+if (env.isProduction && TEST_SECRET_KEYS.has(env.TURNSTILE_SECRET_KEY)) {
+  logger.warn(
+    'TURNSTILE_SECRET_KEY is a Cloudflare test key: every CAPTCHA passes. ' +
+      'Replace it with the real secret before accepting public traffic.',
+  );
+}
+
 /** Wrapped in an object so tests can spy on `captcha.verify`. */
 export const captcha = {
   /**
    * Verify a Cloudflare Turnstile token. Skipped (returns true) when
-   * TURNSTILE_SECRET_KEY is not configured.
+   * TURNSTILE_SECRET_KEY is not configured, which config/env.js only allows
+   * outside production.
    * @returns {Promise<boolean>}
    */
   async verify(token, ipAddress) {
