@@ -6,6 +6,7 @@ Asumsi domain: frontend `https://threevo.id`, API `https://api.threevo.id`.
 ## Daftar isi
 1. [Checklist env production](#1-checklist-env-production)
 2. [Opsi A — Docker Compose (disarankan)](#2-opsi-a--docker-compose-disarankan)
+2b. [Urutan seed](#2b-urutan-seed)
 3. [Opsi B — PM2 tanpa Docker](#3-opsi-b--pm2-tanpa-docker)
 4. [Nginx + SSL Let's Encrypt](#4-nginx--ssl-lets-encrypt)
 5. [Update versi & migration](#5-update-versi--migration)
@@ -48,10 +49,15 @@ docker compose -f docker-compose.prod.yml logs -f api
 ```
 
 Container `api` otomatis menjalankan `prisma migrate deploy` sebelum start
-(`npm run start:prod`). Seed pertama kali:
+(`npm run start:prod`). Seed pertama kali dijalankan **berurutan** (lihat
+[bagian 2b](#2b-urutan-seed) untuk penjelasan tiap langkah):
 
 ```bash
-docker compose -f docker-compose.prod.yml exec api node prisma/seed.js
+CO="docker compose -f docker-compose.prod.yml"
+$CO exec api node prisma/seed.js            # 1. admin, settings, kategori, struktur dasar
+$CO exec api node prisma/seed-content.js    # 2. konten asli Threevo (layanan, lokasi, harga)
+$CO exec api node prisma/seed-articles.js   # 3. artikel contoh - opsional
+$CO restart api                             # segarkan cache endpoint publik
 ```
 
 Catatan:
@@ -59,6 +65,34 @@ Catatan:
 - PostgreSQL tidak membuka port ke luar.
 - File upload disimpan di volume `uploads`, database di volume `postgres_data`.
 - Image berjalan sebagai user non-root dan punya `HEALTHCHECK` ke `/api/v1/health`.
+
+## 2b. Urutan seed
+
+Seed dipecah menjadi tiga script yang **harus dijalankan berurutan**, karena tiap
+langkah bergantung pada data yang dibuat langkah sebelumnya.
+
+| Urutan | Script | Isi | Sifat |
+|---|---|---|---|
+| 1 | `prisma/seed.js` | Super admin, settings default, kategori artikel, layanan placeholder | Wajib. Idempoten: data yang sudah ada dilewati, tidak ditimpa |
+| 2 | `prisma/seed-content.js` | Konten asli Threevo: layanan, lokasi, halaman harga, settings company profile | Wajib untuk situs production. **Menimpa** isi layanan & settings setiap dijalankan |
+| 3 | `prisma/seed-articles.js` | Artikel contoh untuk demo | Opsional. Butuh kategori (langkah 1) dan super admin (langkah 1) |
+
+Catatan penting:
+
+- **Langkah 1 wajib lebih dulu.** `seed-articles.js` mencari kategori dan user
+  `SUPER_ADMIN`; kalau belum ada, artikel dilewati dengan peringatan, bukan error.
+- **Langkah 2 sengaja menimpa** isi layanan dan settings. Ini aman diulang saat konten
+  company profile diperbarui, tapi berarti **perubahan yang Anda buat lewat panel admin
+  pada layanan/settings akan tertimpa**. Setelah situs live, perbarui konten lewat panel
+  admin saja, jangan jalankan ulang script ini tanpa sadar.
+- Langkah 3 bisa dibatalkan: `npm run db:seed:articles -- --remove` hanya menghapus slug
+  contoh yang terdaftar di `prisma/content/articles.js`, artikel tulisan sendiri aman.
+- **Restart API setelah seed.** Endpoint publik memakai cache in-memory
+  (`CACHE_TTL_SECONDS`, default 300 detik), jadi tanpa restart konten baru belum muncul
+  sampai cache kedaluwarsa.
+- `SEED_ADMIN_PASSWORD` wajib ada di env saat langkah 1 (di production script gagal
+  tanpa itu). Setelah login pertama, ganti password admin lalu hapus variabel ini dari
+  `.env.production`.
 
 ## 3. Opsi B — PM2 tanpa Docker
 
@@ -69,7 +103,12 @@ cd /srv/threevo-api
 npm ci                      # termasuk prisma CLI untuk migration
 cp .env.production.example .env && nano .env && chmod 600 .env
 npm run db:deploy
-node prisma/seed.js         # hanya pertama kali
+
+# Seed pertama kali, berurutan (lihat bagian 2b)
+node prisma/seed.js
+npm run db:seed:content
+npm run db:seed:articles    # opsional
+
 npm install -g pm2
 ```
 
@@ -157,6 +196,10 @@ npm ci && npm run db:deploy && pm2 reload threevo-api
 
 - Jangan pernah menjalankan `prisma migrate dev` atau `migrate reset` di production.
 - Migration dibuat di lokal (`npm run db:migrate`), di-commit, lalu diterapkan dengan `migrate deploy`.
+- **Jangan jalankan ulang `seed-content.js` saat update rutin.** Script itu menimpa layanan
+  dan settings, termasuk perubahan yang sudah dibuat lewat panel admin (lihat
+  [bagian 2b](#2b-urutan-seed)). Jalankan hanya saat konten company profile memang
+  sengaja diperbarui dari repo.
 
 ## 6. Backup & restore
 
