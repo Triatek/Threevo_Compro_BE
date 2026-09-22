@@ -1,2 +1,19 @@
 node_modules/
+coverage/
+
+# Environment files (never commit secrets)
 .env
+.env.*
+!.env.example
+!.env.test.example
+!.env.production.example
+
+# Uploaded files
+uploads/
+
+# Logs
+*.log
+uploads-test/
+
+# Database backups
+backups/

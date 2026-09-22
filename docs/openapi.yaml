@@ -1,0 +1,3348 @@
+openapi: 3.1.0
+info:
+  title: Threevo Compro API
+  version: 1.0.0
+  description: |-
+    REST API untuk website company profile Threevo (CMS, lead, proxy tracking).
+
+    Format respons standar:
+    - Sukses: `{ "success": true, "message"?: string, "data": ..., "meta"?: {...} }`
+    - Error: `{ "success": false, "error": { "code", "message", "details"? } }`
+
+    Autentikasi admin memakai cookie httpOnly `access_token` (15 menit) dan `refresh_token` (7 hari).
+    Frontend wajib mengirim request dengan `credentials: "include"`. Jika mendapat 401, panggil
+    `POST /auth/refresh` sekali lalu ulangi request; jika refresh juga 401, arahkan ke halaman login.
+servers:
+  - url: /api/v1
+    description: Server ini (relatif)
+  - url: http://localhost:4000/api/v1
+    description: Development
+tags:
+  - name: System
+  - name: Auth
+  - name: Admin - Users
+  - name: Admin - Audit Logs
+  - name: Public
+  - name: Admin - Settings
+  - name: Admin - Banners
+  - name: Admin - Clients
+  - name: Admin - Testimonials
+  - name: Admin - Services
+  - name: Admin - Locations
+  - name: Admin - Categories
+  - name: Admin - Articles
+  - name: Admin - Media
+  - name: Admin - Dashboard
+  - name: Admin - Leads
+  - name: SEO
+paths:
+  /health:
+    get:
+      tags:
+        - System
+      summary: Health check (termasuk koneksi database)
+      responses:
+        "200":
+          description: Server dan database sehat
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Health"
+        "503":
+          description: Database tidak dapat dihubungi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error:
+                  code: SERVICE_UNAVAILABLE
+                  message: Layanan sedang tidak tersedia
+                  details:
+                    - field: database
+                      message: Database tidak dapat dihubungi
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Login (set cookie access_token & refresh_token)
+      description: Rate limit 10 request / 15 menit per IP. Pesan gagal selalu sama.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /auth/refresh:
+    post:
+      tags:
+        - Auth
+      summary: Perbarui sesi (rotasi refresh token)
+      description: Memakai cookie `refresh_token` (path /api/v1/auth). Token lama langsung tidak berlaku. Memakai ulang token lama mencabut semua sesi user.
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: Logout (cabut refresh token & hapus cookie)
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+  /auth/me:
+    get:
+      tags:
+        - Auth
+      summary: Profil user yang login
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /auth/me/password:
+    patch:
+      tags:
+        - Auth
+      summary: Ganti password sendiri
+      description: Semua sesi lain dicabut; sesi saat ini tetap aktif. Password lama salah → 422.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - currentPassword
+                - newPassword
+              properties:
+                currentPassword:
+                  type: string
+                newPassword:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+                  description: Minimal 8 karakter, mengandung huruf dan angka
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/users:
+    get:
+      tags:
+        - Admin - Users
+      summary: Daftar user (SUPER_ADMIN)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Q"
+        - name: role
+          in: query
+          schema:
+            $ref: "#/components/schemas/Role"
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags:
+        - Admin - Users
+      summary: Buat user (SUPER_ADMIN)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - password
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+                  description: Minimal 8 karakter, mengandung huruf dan angka
+                role:
+                  $ref: "#/components/schemas/Role"
+                isActive:
+                  type: boolean
+                  default: true
+      responses:
+        "201":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/users/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags:
+        - Admin - Users
+      summary: Detail user
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/User"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Admin - Users
+      summary: Ubah user
+      description: Tidak bisa menonaktifkan/mengubah role diri sendiri atau super admin aktif terakhir. Ganti password/nonaktifkan mencabut semua sesi user tersebut.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+                  description: Minimal 8 karakter, mengandung huruf dan angka
+                role:
+                  $ref: "#/components/schemas/Role"
+                isActive:
+                  type: boolean
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - Admin - Users
+      summary: Nonaktifkan user (data tidak dihapus)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/audit-logs:
+    get:
+      tags:
+        - Admin - Audit Logs
+      summary: Daftar audit log (SUPER_ADMIN)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - name: entity
+          in: query
+          schema:
+            type: string
+          example: Article
+        - name: action
+          in: query
+          schema:
+            type: string
+          example: UPDATE
+        - name: userId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/AuditLog"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /site:
+    get:
+      tags:
+        - Public
+      summary: Data situs untuk Home & layout
+      description: Settings publik, banner/klien/testimoni aktif, dan layanan featured. Di-cache di server & diinvalidasi saat admin mengubah data.
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Site"
+  /admin/settings:
+    get:
+      tags:
+        - Admin - Settings
+      summary: Semua setting (SUPER_ADMIN)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Settings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    put:
+      tags:
+        - Admin - Settings
+      summary: Simpan setting (SUPER_ADMIN)
+      description: Kirim sebagian atau semua key. Key tidak dikenal → 422. Kosongkan nilai dengan string "".
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsInput"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Settings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/banners:
+    get:
+      tags:
+        - Admin - Banners
+      summary: Daftar banners (urut sortOrder)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Banner"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Admin - Banners
+      summary: Buat banners
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/BannerInput"
+                - required:
+                    - title
+                    - image
+      responses:
+        "201":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Banner"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/banners/reorder:
+    patch:
+      tags:
+        - Admin - Banners
+      summary: Ubah urutan banners
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderItems"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/banners/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags:
+        - Admin - Banners
+      summary: Detail
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Banner"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Admin - Banners
+      summary: Ubah (sebagian field)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/BannerInput"
+                - minProperties: 1
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Banner"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - Admin - Banners
+      summary: Hapus
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/clients:
+    get:
+      tags:
+        - Admin - Clients
+      summary: Daftar clients (urut sortOrder)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Client"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Admin - Clients
+      summary: Buat clients
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ClientInput"
+                - required:
+                    - name
+                    - logo
+      responses:
+        "201":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Client"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/clients/reorder:
+    patch:
+      tags:
+        - Admin - Clients
+      summary: Ubah urutan clients
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderItems"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/clients/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags:
+        - Admin - Clients
+      summary: Detail
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Client"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Admin - Clients
+      summary: Ubah (sebagian field)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ClientInput"
+                - minProperties: 1
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Client"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - Admin - Clients
+      summary: Hapus
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/testimonials:
+    get:
+      tags:
+        - Admin - Testimonials
+      summary: Daftar testimonials (urut sortOrder)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Testimonial"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Admin - Testimonials
+      summary: Buat testimonials
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/TestimonialInput"
+                - required:
+                    - name
+                    - message
+      responses:
+        "201":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Testimonial"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/testimonials/reorder:
+    patch:
+      tags:
+        - Admin - Testimonials
+      summary: Ubah urutan testimonials
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderItems"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/testimonials/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags:
+        - Admin - Testimonials
+      summary: Detail
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Testimonial"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Admin - Testimonials
+      summary: Ubah (sebagian field)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/TestimonialInput"
+                - minProperties: 1
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Testimonial"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - Admin - Testimonials
+      summary: Hapus
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /services:
+    get:
+      tags:
+        - Public
+      summary: Daftar layanan aktif (urut sortOrder, tanpa content)
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/PublicService"
+  /services/{slug}:
+    get:
+      tags:
+        - Public
+      summary: Detail layanan aktif
+      parameters:
+        - $ref: "#/components/parameters/Slug"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/PublicServiceDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /locations:
+    get:
+      tags:
+        - Public
+      summary: Daftar lokasi aktif (untuk peta)
+      parameters:
+        - name: city
+          in: query
+          schema:
+            type: string
+          description: Tidak peka huruf besar/kecil
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/LocationType"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/PublicLocation"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/services:
+    get:
+      tags:
+        - Admin - Services
+      summary: Daftar services
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Q"
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+        - name: isFeatured
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Service"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Admin - Services
+      summary: Buat services
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ServiceInput"
+                - required:
+                    - name
+      responses:
+        "201":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Service"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/services/reorder:
+    patch:
+      tags:
+        - Admin - Services
+      summary: Ubah urutan services
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderItems"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/services/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags:
+        - Admin - Services
+      summary: Detail
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Service"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Admin - Services
+      summary: Ubah (sebagian field)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ServiceInput"
+                - minProperties: 1
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Service"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - Admin - Services
+      summary: Hapus (soft delete)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/locations:
+    get:
+      tags:
+        - Admin - Locations
+      summary: Daftar locations
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Q"
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/LocationType"
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Location"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Admin - Locations
+      summary: Buat locations
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/LocationInput"
+                - required:
+                    - name
+                    - address
+                    - city
+      responses:
+        "201":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Location"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/locations/reorder:
+    patch:
+      tags:
+        - Admin - Locations
+      summary: Ubah urutan locations
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderItems"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/locations/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags:
+        - Admin - Locations
+      summary: Detail
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Location"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Admin - Locations
+      summary: Ubah (sebagian field)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/LocationInput"
+                - minProperties: 1
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Location"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - Admin - Locations
+      summary: Hapus
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /categories:
+    get:
+      tags:
+        - Public
+      summary: Semua kategori + jumlah artikel published
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Category"
+  /articles:
+    get:
+      tags:
+        - Public
+      summary: Daftar artikel published (tanpa content)
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Slug kategori
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Cari di judul & excerpt
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ArticleSummary"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /articles/{slug}:
+    get:
+      tags:
+        - Public
+      summary: Detail artikel published + 3 artikel terkait
+      description: Setiap request menambah viewCount.
+      parameters:
+        - $ref: "#/components/parameters/Slug"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/ArticleDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/categories:
+    get:
+      tags:
+        - Admin - Categories
+      summary: Daftar kategori
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Category"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Admin - Categories
+      summary: Buat kategori
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/CategoryInput"
+                - required:
+                    - name
+      responses:
+        "201":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Category"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/categories/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags:
+        - Admin - Categories
+      summary: Detail kategori
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Category"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Admin - Categories
+      summary: Ubah kategori
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/CategoryInput"
+                - minProperties: 1
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Category"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - Admin - Categories
+      summary: Hapus kategori (409 jika masih dipakai artikel)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /admin/articles:
+    get:
+      tags:
+        - Admin - Articles
+      summary: Daftar artikel (tanpa content)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Q"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ArticleStatus"
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Slug kategori
+        - name: categoryId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Article"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Admin - Articles
+      summary: Buat artikel (default DRAFT)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ArticleInput"
+                - required:
+                    - title
+                    - content
+      responses:
+        "201":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Article"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/articles/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags:
+        - Admin - Articles
+      summary: Detail artikel
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Article"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Admin - Articles
+      summary: Ubah artikel
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ArticleInput"
+                - minProperties: 1
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Article"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - Admin - Articles
+      summary: Hapus artikel (soft delete)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/articles/{id}/publish:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    patch:
+      tags:
+        - Admin - Articles
+      summary: Publikasikan (publishedAt diisi jika kosong)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Article"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/articles/{id}/unpublish:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    patch:
+      tags:
+        - Admin - Articles
+      summary: Kembalikan ke draft
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Article"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/media:
+    get:
+      tags:
+        - Admin - Media
+      summary: Daftar media
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Q"
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Media"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags:
+        - Admin - Media
+      summary: Unggah gambar
+      description: JPG/PNG/WebP (isi file diverifikasi), maks UPLOAD_MAX_SIZE_MB. Dikonversi ke WebP kualitas 82, lebar maks 1920 px, metadata EXIF dihapus. SVG tidak didukung.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                alt:
+                  type: string
+                  maxLength: 200
+      responses:
+        "201":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Media"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "413":
+          description: File terlalu besar
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/media/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    delete:
+      tags:
+        - Admin - Media
+      summary: Hapus media beserta file fisiknya
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /leads:
+    post:
+      tags:
+        - Public
+      summary: Kirim form Contact Us
+      description: Rate limit 5 request / 15 menit per IP. Query `utm_source` (opsional) disimpan sebagai sumber; jika tidak ada dipakai header Referer. Email notifikasi dikirim di belakang layar.
+      parameters:
+        - name: utm_source
+          in: query
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadInput"
+      responses:
+        "201":
+          description: Pesan diterima
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "400":
+          description: Verifikasi CAPTCHA gagal
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+  /admin/dashboard:
+    get:
+      tags:
+        - Admin - Dashboard
+      summary: Ringkasan untuk dashboard admin
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Dashboard"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /admin/leads:
+    get:
+      tags:
+        - Admin - Leads
+      summary: Daftar lead (tanpa pesan)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/LeadStatus"
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Cari di nama, email, perusahaan, telepon
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: YYYY-MM-DD (WIB, inklusif)
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: YYYY-MM-DD (WIB, inklusif)
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Lead"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+  /admin/leads/export:
+    get:
+      tags:
+        - Admin - Leads
+      summary: Ekspor CSV (filter sama dengan daftar, maks 10.000 baris)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/LeadStatus"
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Cari di nama, email, perusahaan, telepon
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+          description: YYYY-MM-DD (WIB, inklusif)
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+          description: YYYY-MM-DD (WIB, inklusif)
+      responses:
+        "200":
+          description: File CSV UTF-8 dengan BOM
+          content:
+            text/csv:
+              schema:
+                type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /admin/leads/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags:
+        - Admin - Leads
+      summary: Detail lead
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Lead"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags:
+        - Admin - Leads
+      summary: Ubah status / catatan
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                status:
+                  $ref: "#/components/schemas/LeadStatus"
+                notes:
+                  type:
+                    - string
+                    - "null"
+                  maxLength: 5000
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Lead"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags:
+        - Admin - Leads
+      summary: Hapus lead (soft delete, SUPER_ADMIN)
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        type: "null"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /tracking/{awb}:
+    get:
+      tags:
+        - Public
+      summary: Cek resi (proxy ke TMS)
+      description: "Resi 6-30 karakter alfanumerik. Rate limit 30 request / 15 menit per IP, hasil di-cache 2 menit. Provider mock: resi berawalan TEST mengembalikan data contoh (TESTDLV... = terkirim)."
+      parameters:
+        - name: awb
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: ^[A-Za-z0-9]{6,30}$
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/SuccessResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/Tracking"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "502":
+          description: Sistem TMS tidak tersedia (TRACKING_UNAVAILABLE)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /sitemap.xml:
+    servers:
+      - url: /
+        description: Di luar prefix API
+    get:
+      tags:
+        - SEO
+      summary: Sitemap XML (halaman statis, layanan aktif, artikel published)
+      responses:
+        "200":
+          description: XML
+          content:
+            application/xml:
+              schema:
+                type: string
+  /robots.txt:
+    servers:
+      - url: /
+        description: Di luar prefix API
+    get:
+      tags:
+        - SEO
+      summary: "robots.txt (non-production: Disallow semua)"
+      responses:
+        "200":
+          description: Teks
+          content:
+            text/plain:
+              schema:
+                type: string
+components:
+  schemas:
+    SuccessResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          const: true
+        message:
+          type: string
+        data: {}
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          const: false
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              enum:
+                - BAD_REQUEST
+                - INVALID_JSON
+                - UNAUTHORIZED
+                - FORBIDDEN
+                - NOT_FOUND
+                - CONFLICT
+                - PAYLOAD_TOO_LARGE
+                - VALIDATION_ERROR
+                - TOO_MANY_REQUESTS
+                - INTERNAL_SERVER_ERROR
+                - SERVICE_UNAVAILABLE
+                - TRACKING_UNAVAILABLE
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  location:
+                    type: string
+                    enum:
+                      - body
+                      - query
+                      - params
+                  field:
+                    type: string
+                  message:
+                    type: string
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          example: 42
+        totalPages:
+          type: integer
+          example: 5
+        hasNextPage:
+          type: boolean
+        hasPrevPage:
+          type: boolean
+    Health:
+      type: object
+      properties:
+        status:
+          type: string
+          example: OK
+        uptime:
+          type: integer
+          description: Detik sejak server berjalan
+        timestamp:
+          type: string
+          format: date-time
+        services:
+          type: object
+          properties:
+            database:
+              type: string
+              enum:
+                - up
+                - down
+    Role:
+      type: string
+      enum:
+        - SUPER_ADMIN
+        - EDITOR
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: "#/components/schemas/Role"
+        isActive:
+          type: boolean
+        lastLoginAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type:
+            - integer
+            - "null"
+        action:
+          type: string
+          example: UPDATE
+        entity:
+          type: string
+          example: Article
+        entityId:
+          type:
+            - string
+            - "null"
+        metadata:
+          type:
+            - object
+            - "null"
+        ipAddress:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+        user:
+          type:
+            - object
+            - "null"
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            email:
+              type: string
+    ReorderItems:
+      type: array
+      minItems: 1
+      items:
+        type: object
+        required:
+          - id
+          - sortOrder
+        properties:
+          id:
+            type: integer
+          sortOrder:
+            type: integer
+            minimum: 0
+      example:
+        - id: 3
+          sortOrder: 0
+        - id: 1
+          sortOrder: 1
+    ImageUrl:
+      type: string
+      description: URL http(s) atau path `/uploads/...` dari POST /admin/media
+      example: /uploads/2026/01/abc.webp
+    BannerInput:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 150
+        subtitle:
+          type:
+            - string
+            - "null"
+          maxLength: 300
+        image:
+          $ref: "#/components/schemas/ImageUrl"
+        ctaText:
+          type:
+            - string
+            - "null"
+          maxLength: 50
+        ctaLink:
+          type:
+            - string
+            - "null"
+          description: URL http(s) atau path diawali "/"
+        sortOrder:
+          type: integer
+          default: 0
+        isActive:
+          type: boolean
+          default: true
+    ClientInput:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 150
+        logo:
+          $ref: "#/components/schemas/ImageUrl"
+        website:
+          type:
+            - string
+            - "null"
+          format: uri
+        sortOrder:
+          type: integer
+          default: 0
+        isActive:
+          type: boolean
+          default: true
+    TestimonialInput:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        position:
+          type:
+            - string
+            - "null"
+        company:
+          type:
+            - string
+            - "null"
+        message:
+          type: string
+          maxLength: 2000
+        photo:
+          oneOf:
+            - $ref: "#/components/schemas/ImageUrl"
+            - type: "null"
+        sortOrder:
+          type: integer
+          default: 0
+        isActive:
+          type: boolean
+          default: true
+    Settings:
+      type: object
+      description: Objek key-value. Endpoint publik hanya berisi setting publik.
+      additionalProperties:
+        type: string
+      example:
+        company_name: Threevo
+        whatsapp_number: "6281200000000"
+        whatsapp_message: Halo Threevo...
+    SettingsInput:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        company_name:
+          type: string
+        company_tagline:
+          type: string
+        contact_phone:
+          type: string
+        contact_email:
+          type: string
+        contact_address:
+          type: string
+        contact_maps_url:
+          type: string
+        whatsapp_number:
+          type: string
+        whatsapp_message:
+          type: string
+        social_instagram:
+          type: string
+        social_linkedin:
+          type: string
+        social_youtube:
+          type: string
+        social_tiktok:
+          type: string
+        tracking_url:
+          type: string
+        footer_text:
+          type: string
+        lead_notification_email:
+          type: string
+          description: Privat. Boleh beberapa email dipisah koma.
+    ServiceSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        shortDesc:
+          type:
+            - string
+            - "null"
+        icon:
+          type:
+            - string
+            - "null"
+        image:
+          type:
+            - string
+            - "null"
+    Banner:
+      allOf:
+        - $ref: "#/components/schemas/BannerInput"
+        - type: object
+          properties:
+            id:
+              type: integer
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+    Client:
+      allOf:
+        - $ref: "#/components/schemas/ClientInput"
+        - type: object
+          properties:
+            id:
+              type: integer
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+    Testimonial:
+      allOf:
+        - $ref: "#/components/schemas/TestimonialInput"
+        - type: object
+          properties:
+            id:
+              type: integer
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+    Site:
+      type: object
+      properties:
+        settings:
+          $ref: "#/components/schemas/Settings"
+        banners:
+          type: array
+          items:
+            $ref: "#/components/schemas/Banner"
+        clients:
+          type: array
+          items:
+            $ref: "#/components/schemas/Client"
+        testimonials:
+          type: array
+          items:
+            $ref: "#/components/schemas/Testimonial"
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceSummary"
+          description: Layanan featured
+    ServiceInput:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 150
+        slug:
+          type: string
+          description: Opsional. Jika kosong dibuat otomatis dari nama (unik, -2, -3). Slug eksplisit yang bentrok → 409.
+        shortDesc:
+          type:
+            - string
+            - "null"
+          maxLength: 300
+        content:
+          type:
+            - string
+            - "null"
+          description: HTML; disanitasi di server
+        icon:
+          type:
+            - string
+            - "null"
+          description: Nama ikon untuk frontend atau URL gambar
+        image:
+          oneOf:
+            - $ref: "#/components/schemas/ImageUrl"
+            - type: "null"
+        metaTitle:
+          type:
+            - string
+            - "null"
+          maxLength: 70
+        metaDescription:
+          type:
+            - string
+            - "null"
+          maxLength: 160
+        isFeatured:
+          type: boolean
+          default: false
+        sortOrder:
+          type: integer
+          default: 0
+        isActive:
+          type: boolean
+          default: true
+    PublicService:
+      allOf:
+        - $ref: "#/components/schemas/ServiceSummary"
+        - type: object
+          properties:
+            isFeatured:
+              type: boolean
+            sortOrder:
+              type: integer
+    PublicServiceDetail:
+      allOf:
+        - $ref: "#/components/schemas/PublicService"
+        - type: object
+          properties:
+            content:
+              type:
+                - string
+                - "null"
+            metaTitle:
+              type:
+                - string
+                - "null"
+            metaDescription:
+              type:
+                - string
+                - "null"
+            updatedAt:
+              type: string
+              format: date-time
+    LocationType:
+      type: string
+      enum:
+        - WAREHOUSE
+        - OFFICE
+        - HUB
+    LocationInput:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 150
+        type:
+          $ref: "#/components/schemas/LocationType"
+        address:
+          type: string
+          maxLength: 300
+        city:
+          type: string
+          maxLength: 100
+        province:
+          type:
+            - string
+            - "null"
+        latitude:
+          type:
+            - number
+            - "null"
+          minimum: -90
+          maximum: 90
+          description: Wajib diisi bersama longitude
+        longitude:
+          type:
+            - number
+            - "null"
+          minimum: -180
+          maximum: 180
+        phone:
+          type:
+            - string
+            - "null"
+          maxLength: 30
+        mapsUrl:
+          type:
+            - string
+            - "null"
+          format: uri
+        sortOrder:
+          type: integer
+          default: 0
+        isActive:
+          type: boolean
+          default: true
+    Service:
+      allOf:
+        - $ref: "#/components/schemas/ServiceInput"
+        - type: object
+          properties:
+            id:
+              type: integer
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+    Location:
+      allOf:
+        - $ref: "#/components/schemas/LocationInput"
+        - type: object
+          properties:
+            id:
+              type: integer
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+    PublicLocation:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/LocationType"
+        address:
+          type: string
+        city:
+          type: string
+        province:
+          type:
+            - string
+            - "null"
+        latitude:
+          type:
+            - number
+            - "null"
+        longitude:
+          type:
+            - number
+            - "null"
+        phone:
+          type:
+            - string
+            - "null"
+        mapsUrl:
+          type:
+            - string
+            - "null"
+    ArticleStatus:
+      type: string
+      enum:
+        - DRAFT
+        - PUBLISHED
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        articleCount:
+          type: integer
+          description: "Publik: jumlah artikel published. Admin: semua artikel yang tidak dihapus."
+    CategoryInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        slug:
+          type: string
+          description: Opsional, otomatis dari nama
+    ArticleSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        slug:
+          type: string
+        excerpt:
+          type:
+            - string
+            - "null"
+        coverImage:
+          type:
+            - string
+            - "null"
+        publishedAt:
+          type: string
+          format: date-time
+        category:
+          type:
+            - object
+            - "null"
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            slug:
+              type: string
+        author:
+          type:
+            - object
+            - "null"
+          properties:
+            name:
+              type: string
+    ArticleDetail:
+      allOf:
+        - $ref: "#/components/schemas/ArticleSummary"
+        - type: object
+          properties:
+            content:
+              type: string
+              description: HTML yang sudah disanitasi
+            metaTitle:
+              type:
+                - string
+                - "null"
+            metaDescription:
+              type:
+                - string
+                - "null"
+            viewCount:
+              type: integer
+            updatedAt:
+              type: string
+              format: date-time
+            related:
+              type: array
+              maxItems: 3
+              items:
+                $ref: "#/components/schemas/ArticleSummary"
+              description: Artikel lain di kategori yang sama
+    ArticleInput:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 200
+        slug:
+          type: string
+          description: Opsional. Otomatis dari judul (unik, -2, -3). Slug eksplisit yang bentrok → 409.
+        excerpt:
+          type:
+            - string
+            - "null"
+          maxLength: 500
+        content:
+          type: string
+          description: HTML; disanitasi di server
+        coverImage:
+          oneOf:
+            - $ref: "#/components/schemas/ImageUrl"
+            - type: "null"
+        status:
+          $ref: "#/components/schemas/ArticleStatus"
+        publishedAt:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: Kosong + PUBLISHED → diisi waktu sekarang. Tanggal di masa depan = terjadwal.
+        metaTitle:
+          type:
+            - string
+            - "null"
+          maxLength: 70
+        metaDescription:
+          type:
+            - string
+            - "null"
+          maxLength: 160
+        categoryId:
+          type:
+            - integer
+            - "null"
+    Article:
+      allOf:
+        - $ref: "#/components/schemas/ArticleInput"
+        - type: object
+          properties:
+            id:
+              type: integer
+            viewCount:
+              type: integer
+            authorId:
+              type:
+                - integer
+                - "null"
+            category:
+              type:
+                - object
+                - "null"
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+                slug:
+                  type: string
+            author:
+              type:
+                - object
+                - "null"
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+    Media:
+      type: object
+      properties:
+        id:
+          type: integer
+        filename:
+          type: string
+          example: 2026/01/3f2a...webp
+        originalName:
+          type: string
+        url:
+          type: string
+          format: uri
+          description: URL publik; pakai nilai ini di field gambar konten
+        mimeType:
+          type: string
+          example: image/webp
+        size:
+          type: integer
+          description: Byte setelah konversi
+        width:
+          type: integer
+        height:
+          type: integer
+        alt:
+          type:
+            - string
+            - "null"
+        uploadedById:
+          type:
+            - integer
+            - "null"
+        uploadedBy:
+          type:
+            - object
+            - "null"
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+        createdAt:
+          type: string
+          format: date-time
+    LeadStatus:
+      type: string
+      enum:
+        - NEW
+        - CONTACTED
+        - CLOSED
+    LeadInput:
+      type: object
+      required:
+        - name
+        - email
+        - message
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          maxLength: 30
+          example: 0812-3456-7890
+        company:
+          type: string
+          maxLength: 150
+        serviceInterest:
+          type: string
+          maxLength: 150
+          example: Fulfillment
+        message:
+          type: string
+          minLength: 10
+          maxLength: 5000
+        website:
+          type: string
+          description: "Honeypot: sembunyikan field ini di form dan biarkan kosong"
+        captchaToken:
+          type: string
+          description: Token Cloudflare Turnstile (wajib jika TURNSTILE_SECRET_KEY diset di server)
+    Lead:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type:
+            - string
+            - "null"
+        company:
+          type:
+            - string
+            - "null"
+        serviceInterest:
+          type:
+            - string
+            - "null"
+        message:
+          type: string
+          description: Tidak ada di endpoint daftar
+        status:
+          $ref: "#/components/schemas/LeadStatus"
+        notes:
+          type:
+            - string
+            - "null"
+        source:
+          type:
+            - string
+            - "null"
+        ipAddress:
+          type:
+            - string
+            - "null"
+        userAgent:
+          type:
+            - string
+            - "null"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Dashboard:
+      type: object
+      properties:
+        articles:
+          type: object
+          properties:
+            DRAFT:
+              type: integer
+            PUBLISHED:
+              type: integer
+            total:
+              type: integer
+        leads:
+          type: object
+          properties:
+            NEW:
+              type: integer
+            CONTACTED:
+              type: integer
+            CLOSED:
+              type: integer
+            total:
+              type: integer
+        leadsLast30Days:
+          type: array
+          minItems: 30
+          maxItems: 30
+          description: Urut dari yang terlama; tanggal dalam WIB
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              count:
+                type: integer
+        recentLeads:
+          type: array
+          maxItems: 5
+          items:
+            $ref: "#/components/schemas/Lead"
+    Tracking:
+      type: object
+      properties:
+        awb:
+          type: string
+          example: TEST123456
+        status:
+          type: string
+          enum:
+            - PENDING
+            - PICKED_UP
+            - IN_TRANSIT
+            - OUT_FOR_DELIVERY
+            - DELIVERED
+            - FAILED_DELIVERY
+            - RETURNED
+            - UNKNOWN
+        statusLabel:
+          type: string
+          example: Dalam perjalanan
+        origin:
+          type:
+            - string
+            - "null"
+        destination:
+          type:
+            - string
+            - "null"
+        estimatedDelivery:
+          type:
+            - string
+            - "null"
+          format: date-time
+        history:
+          type: array
+          description: Urut dari yang terbaru
+          items:
+            type: object
+            properties:
+              timestamp:
+                type: string
+                format: date-time
+              status:
+                type: string
+                enum:
+                  - PENDING
+                  - PICKED_UP
+                  - IN_TRANSIT
+                  - OUT_FOR_DELIVERY
+                  - DELIVERED
+                  - FAILED_DELIVERY
+                  - RETURNED
+                  - UNKNOWN
+              location:
+                type:
+                  - string
+                  - "null"
+              description:
+                type:
+                  - string
+                  - "null"
+  responses:
+    ValidationError:
+      description: Data tidak valid
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    TooManyRequests:
+      description: Rate limit terlampaui
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    BadRequest:
+      description: Permintaan tidak valid (400)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Belum login / sesi tidak valid (401)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Role tidak memiliki akses (403)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Data tidak ditemukan (404)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Data bentrok, mis. slug/email sudah dipakai (409)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+      description: Diset otomatis oleh POST /auth/login
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Alternatif untuk tools seperti Postman
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    Slug:
+      name: slug
+      in: path
+      required: true
+      schema:
+        type: string
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 10
+    Q:
+      name: q
+      in: query
+      schema:
+        type: string
+      description: Kata kunci pencarian
